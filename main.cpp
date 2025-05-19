@@ -23,7 +23,7 @@ class CivilAircraft : Aircraft
 public:
 
 	//Constructor for initialization of aircraft constants.
-	CivilAircraft(Eigen::VectorXd&& states, Eigen::VectorXd& controls) : pi(std::numbers::pi)
+	CivilAircraft(Eigen::VectorXd& states, Eigen::VectorXd& controls) : pi(std::numbers::pi)
 	{
 
 		u = states[0]; //u
@@ -91,7 +91,7 @@ public:
 	}
 
 	//Force vector
-	Eigen::Vector3d forces_body_frame(double airSpeed, double alpha, double beta, double dynamicPressure, double g, double q, double theta, double phi)
+	Eigen::Vector3d forces_body_frame(Eigen::Vector3d& ang_vel_be_body_frame, Eigen::Vector3d& translational_vel_body_frame,double airSpeed, double alpha, double beta, double dynamicPressure, double g, double q, double theta, double phi)
 	{
 
 		//Calculate coefficient of lift for wing body in stability axis
@@ -158,13 +158,13 @@ public:
 		Eigen::Vector3d gravity_body({ -g * sin(theta), g * cos(theta) * sin(phi), g * cos(theta) * cos(phi) });
 		gravity_forces_body = mass * gravity_body;
 
+		Eigen::Vector3d total_forces_body = (aerodynamic_forces_body + engine_forces_body + gravity_forces_body);
 
-
-		return (1/mass)*(aerodynamic_forces_body + engine_forces_body + gravity_forces_body);
+		return (1/mass)*total_forces_body - ang_vel_be_body_frame.cross(translational_vel_body_frame);
 	}
 
 	//Moments about aircraft center of gravity expressed in the body frame
-	Eigen::Vector3d cg_moments_body_frame(Eigen::Vector3d& angular_vel_be_body_frame, double airSpeed, double dynamicPressure, double alpha, double beta)
+	Eigen::Vector3d cg_moments_body_frame(Eigen::Vector3d& angular_vel_be_body_frame, double airSpeed, double dynamicPressure, double alpha, double beta,double g)
 	{
 
 		//Calculate moments in body frame about center of gravity.
@@ -218,6 +218,13 @@ public:
 		momentArmEngine2[1] = eng2_y_pos_Fm - y_cg_pos_Fm;
 		momentArmEngine2[2] = z_cg_pos_Fm - eng2_z_pos_Fm;
 
+		//Get thrust of each engine
+		double eng1_thrust = throttle1_inp * mass * g;
+		double eng2_thrust = throttle2_inp * mass * g;
+
+		Eigen::Vector3d engine1_force_body({ eng1_thrust,0,0 });
+		Eigen::Vector3d engine2_force_body({ eng2_thrust,0,0 });
+
 
 		Eigen::Vector3d momentEng1 = momentArmEngine1.cross(engine1_force_body);
 		Eigen::Vector3d momentEng2 = momentArmEngine2.cross(engine2_force_body);
@@ -243,6 +250,8 @@ public:
 			0, cos(phi), sin(phi),
 			0, sin(phi) / cos(theta), cos(phi) / cos(theta);
 		Eigen::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
+
+		return x7tox9dot;
 
 	}
 
@@ -435,7 +444,6 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	double airSpeed = sqrt(u * u + v * v + w * w);
 	double alpha = atan2(w, u);
 	double beta = asin(v / airSpeed);
-
 	double dynamicPressure = 0.5 * sea_level_air_density * pow(airSpeed, 2); //will change with airspeed and air density.
 
 	Eigen::Vector3d angular_vel_be_body_frame({ p,q,r });
@@ -571,7 +579,9 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 
 	////From F_b (all forces resolved in Fb) and calculate the udot, vdot, wdot
 	Eigen::Vector3d forces_body = gravity_forces_body + engine_forces_body + aerodynamic_forces_body;
-	Eigen::Vector3d x1tox3dot = (1 / mass) * forces_body - angular_vel_be_body_frame.cross(translational_vel_body_frame);
+	Eigen::Vector3d x1tox3dot = (1 / mass) * forces_body - angular_vel_be_body_frame.cross(translational_vel_body_frame); 
+	//Eigen::Vector3d x1tox3dot = aircraft.forces_body_frame(angular_vel_be_body_frame, translational_vel_body_frame, airSpeed, alpha, beta, dynamicPressure, g, q, theta, phi);
+	std::cout << "x1 to x3 dot: " << x1tox3dot << std::endl;
 	
 
 
@@ -579,6 +589,8 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	Eigen::Vector3d cg_moments_body = MAcg_b + momentsFromEngineCG_body;
 
 	Eigen::Vector3d x4tox6dot = invInertiaMatrix*(cg_moments_body - angular_vel_be_body_frame.cross(inertiaMatrix * angular_vel_be_body_frame));
+	//Eigen::Vector3d x4tox6dot = aircraft.cg_moments_body_frame(angular_vel_be_body_frame, airSpeed, dynamicPressure, alpha, beta,g);
+
 
 
 	//Calculate phidot, thetadot, psidot
@@ -586,7 +598,11 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	H_pi << 1, sin(phi)* tan(theta), cos(phi)* tan(theta),
 		0, cos(phi), sin(phi),
 		0, sin(phi) / cos(theta), cos(phi) / cos(theta);
-	Eigen::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
+
+	//::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
+	Eigen::Vector3d x7tox9dot = aircraft.euler_angles_euler_kinematics(angular_vel_be_body_frame, phi, theta, psi);
+
+
 
 
 	Eigen::VectorXd XDOT(9);
@@ -989,7 +1005,7 @@ int main()
 	initialU[4] = 0.08;
 
 
-	CivilAircraft ac = CivilAircraft(std::move(initialX), initialU);
+	CivilAircraft ac = CivilAircraft(initialX, initialU);
 
 	double simLength = 150;
 	double steps = 200;
@@ -1066,13 +1082,13 @@ int main()
 	std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd Atest = LinearizeSystem_A(ac,Xdoto, Xo, Uo, dxdot, dx, du);
 	std::cout << Atest << std::endl;
-	std::cout << Atest.eigenvalues() << std::endl;
+	//std::cout << Atest.eigenvalues() << std::endl;
 
 
 
 	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd Btest = LinearizeSystem_B(ac,Xdoto, Xo, Uo, dxdot, dx, du);
-	std::cout << Btest << std::endl;
+	//std::cout << Btest << std::endl;
 
 
 
@@ -1156,7 +1172,7 @@ int main()
 
 
 	// --- Write the non linear solution matrix to a CSV file ---
-	std::ofstream outFile("Linear_Longitudnal_Solution.csv");
+	std::ofstream outFile("Linear_Longitudinal_Solution.csv");
 	if (outFile.is_open()) {
 		for (int i = 0; i < solution_linear_long.rows(); ++i) {
 			for (int j = 0; j < solution_linear_long.cols(); ++j) {
@@ -1174,9 +1190,6 @@ int main()
 		std::cerr << "Unable to open file for writing." << std::endl;
 	}
 
-
-	//CivilAircraft ac = CivilAircraft();
-	//std::cout << ac.InertiaMatrix << std::endl;
 
 
 	return 0;
