@@ -26,15 +26,15 @@ public:
 	CivilAircraft(Eigen::VectorXd& states, Eigen::VectorXd& controls) : pi(std::numbers::pi)
 	{
 
-		u = states[0]; //u
-		v = states[1]; //v
-		w = states[2]; //w
-		p = states[3]; //p
-		q = states[4]; //q
-		r = states[5]; //r
-		phi = states[6]; //phi
-		theta = states[7]; //theta
-		psi = states[8]; //psi
+		u = states[0];
+		v = states[1];
+		w = states[2];
+		p = states[3];
+		q = states[4];
+		r = states[5];
+		phi = states[6];
+		theta = states[7];
+		psi = states[8];
 
 		aileron_inp = controls[0];
 		stabilizer_inp = controls[1];
@@ -48,6 +48,7 @@ public:
 		lt = 24.8;
 		wing_planform_area = 260;
 		tail_planform_area = 64;
+
 
 		x_cg_pos_Fm = 0.23 * mean_aerodynamic_chord;
 		y_cg_pos_Fm = 0.0;
@@ -88,12 +89,68 @@ public:
 		a0 = -15.212;
 		alpha_switch = 14.5 * (pi / 180); //lift slope goes from linear to non-linear
 
+
+
 	}
 
-	//Force vector
-	Eigen::Vector3d forces_body_frame(Eigen::Vector3d& ang_vel_be_body_frame, Eigen::Vector3d& translational_vel_body_frame,double airSpeed, double alpha, double beta, double dynamicPressure, double g, double q, double theta, double phi)
+	Eigen::VectorXd initializeStates(Eigen::VectorXd& stateVector)
 	{
+		//make sure to check size
+		u = stateVector[0];
+		v = stateVector[1];
+		w = stateVector[2];
+		p = stateVector[3];
+		q = stateVector[4];
+		r = stateVector[5];
+		phi = stateVector[6];
+		theta = stateVector[7];
+		psi = stateVector[8];
+		Eigen::VectorXd states(9);
+		states[0] = u;
+		states[1] = v;
+		states[2] = w;
+		states[3] = p;
+		states[4] = q;
+		states[5] = r;
+		states[6] = phi;
+		states[7] = theta;
+		states[8] = psi;
+		return states;
+	}
 
+	Eigen::VectorXd intializeControlInputs(Eigen::VectorXd& controlVector)
+	{
+		//make sure to check size
+		aileron_inp = controlVector[0];
+		stabilizer_inp = controlVector[1];
+		rudder_inp = controlVector[2];
+		throttle1_inp = controlVector[3];
+		throttle2_inp = controlVector[4];
+		
+		Eigen::VectorXd controls(5);
+		controls[0] = aileron_inp;
+		controls[1] = stabilizer_inp;
+		controls[2] = rudder_inp;
+		controls[3] = throttle1_inp;
+		controls[4] = throttle2_inp;
+		return controls;
+	}
+
+	Eigen::Vector3d engine_forces_body_frame(double g)
+	{
+		double engine1_thrust = throttle1_inp * mass * g;
+		double engine2_thrust = throttle2_inp * mass * g;
+
+		Eigen::Vector3d engine1_force_body({ engine1_thrust,0,0 });
+		Eigen::Vector3d engine2_force_body({ engine2_thrust,0,0 });
+		Eigen::Vector3d engine_forces_body = engine1_force_body + engine2_force_body;
+
+		return engine_forces_body;
+	}
+
+	Eigen::Vector3d aerodynamic_forces_stability_axis(double alpha, double beta, double airSpeed, double dynamicPressure)
+	{
+	
 		//Calculate coefficient of lift for wing body in stability axis
 		double coefficient_of_lift_wb{};
 		if (alpha <= alpha_switch)
@@ -110,65 +167,36 @@ public:
 		double angle_of_attack_tail = alpha - downwash_angle + stabilizer_inp + 1.3 * q * lt / airSpeed;
 		double coefficient_of_lift_tail = 3.1 * (tail_planform_area / wing_planform_area) * angle_of_attack_tail;
 
-
-		//Calculate total lift
 		double total_lift = coefficient_of_lift_wb + coefficient_of_lift_tail;
 
 
 		//Total drag (not including tail)
 		double total_drag = 0.13 + 0.07 * pow((5.5 * alpha + 0.654), 2);
-
-
-		//Side force
 		double side_force = -1.6 * beta + 0.24 * rudder_inp;
 
+
 		Eigen::Vector3d aerodynamic_forces_stability({ -total_drag * dynamicPressure * wing_planform_area, side_force * dynamicPressure * wing_planform_area, -total_lift * dynamicPressure * wing_planform_area });
+	
+		return aerodynamic_forces_stability;
+	
+	}
 
-
-
+	Eigen::Vector3d aerodynamic_forces_body_frame(double alpha, double beta, double airSpeed, double dynamicPressure, Eigen::Matrix3d& rot_stab_to_body)
+	{
 		//We need to rotate aerodynamic forces from the stability frame to the body frame via a rotation matrix
-		Eigen::MatrixXd rot_stab_to_body(3, 3);
-		rot_stab_to_body << cos(alpha), 0, -sin(alpha),
-			0, 1, 0,
-			sin(alpha), 0, cos(alpha);
+		Eigen::Vector3d aerodynamic_forces_body = rot_stab_to_body * aerodynamic_forces_stability_axis(alpha,beta,airSpeed,dynamicPressure);
 
-		aerodynamic_forces_body = rot_stab_to_body * aerodynamic_forces_stability;
+		return aerodynamic_forces_body;
 
-
-
-		//Engine forces
-		double engine1_thrust = throttle1_inp * mass * g;
-		double engine2_thrust = throttle2_inp * mass * g;
-
-		engine1_force_body[0] = engine1_thrust; //x
-		engine1_force_body[1] = 0.0; //y
-		engine1_force_body[2] = 0.0; //z
-
-
-		engine2_force_body[0] = engine2_thrust; //x
-		engine2_force_body[1] = 0.0; //y
-		engine2_force_body[2] = 0.0; //z
-
-
-		engine_forces_body = engine1_force_body + engine2_force_body;
-
-
-
-		////Calculate gravitational forces in body frame. This does not cause a moment.
-		Eigen::Vector3d gravity_body({ -g * sin(theta), g * cos(theta) * sin(phi), g * cos(theta) * cos(phi) });
-		gravity_forces_body = mass * gravity_body;
-
-		Eigen::Vector3d total_forces_body = (aerodynamic_forces_body + engine_forces_body + gravity_forces_body);
-
-		return (1/mass)*total_forces_body - ang_vel_be_body_frame.cross(translational_vel_body_frame);
 	}
 
 	//Moments about aircraft center of gravity expressed in the body frame
-	Eigen::Vector3d cg_moments_body_frame(Eigen::Vector3d& angular_vel_be_body_frame, double airSpeed, double dynamicPressure, double alpha, double beta,double g)
+	Eigen::Vector3d cg_moments_body_frame(Eigen::Matrix3d& rot_stab_to_body, Eigen::Vector3d& angular_vel_be_body_frame, double airSpeed, double dynamicPressure, double alpha, double beta,double g)
 	{
-
+		double downwash_angle = depsda * (alpha - alpha_initial);
 		//Calculate moments in body frame about center of gravity.
 		double eta11 = -1.4 * beta;
+		//std::cout << "ac alpha: " << downwash_angle << std::endl;
 		double eta21 = -0.59 - (3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord)) * (alpha - downwash_angle);
 		double eta31 = (1 - alpha * (180 / (15 * pi))) * beta;
 		Eigen::Vector3d eta({ eta11, eta21, eta31 });
@@ -192,31 +220,28 @@ public:
 
 
 		Eigen::Vector3d CMac_b = eta + dCMdx * angular_vel_be_body_frame + dCMdu * uVec;
+		//std::cout << " ac eta" << eta[1]<< std::endl;
 
 
 		//Normalize to an aerodynamic moments
 		Eigen::Vector3d MAac_b = CMac_b * dynamicPressure * wing_planform_area * mean_aerodynamic_chord;
+	
 
 
 		////Transfer moment to CG
 		Eigen::Vector3d rcg_b({ x_cg_pos_Fm,y_cg_pos_Fm,z_cg_pos_Fm });
 		Eigen::Vector3d rac_b({ x_aero_pos_Fm,y_aero_pos_Fm,z_aero_pos_Fm });
-		Eigen::Vector3d crossProduct = aerodynamic_forces_body.cross(rcg_b - rac_b);
+		Eigen::Vector3d crossProduct = aerodynamic_forces_body_frame(alpha,beta,airSpeed,dynamicPressure,rot_stab_to_body).cross(rcg_b - rac_b);
 
 		Eigen::Vector3d MAcg_b = MAac_b + crossProduct;
 
-		cg_aerodynamic_moments_body = (MAac_b + crossProduct);
+		Eigen::Vector3d cg_aerodynamic_moments_body = (MAac_b + crossProduct);
 
 
 
-		//Engine moment due to offset from CG
-		momentArmEngine1[0] = x_cg_pos_Fm - eng1_x_pos_Fm;
-		momentArmEngine1[1] = eng1_y_pos_Fm - y_cg_pos_Fm;
-		momentArmEngine1[2] = z_cg_pos_Fm - eng1_z_pos_Fm;
+		Eigen::Vector3d momentArmEngine1({ x_cg_pos_Fm - eng1_x_pos_Fm, eng1_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng1_z_pos_Fm });
+		Eigen::Vector3d momentArmEngine2({ x_cg_pos_Fm - eng2_x_pos_Fm, eng2_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng2_z_pos_Fm });
 
-		momentArmEngine2[0] = x_cg_pos_Fm - eng2_x_pos_Fm;
-		momentArmEngine2[1] = eng2_y_pos_Fm - y_cg_pos_Fm;
-		momentArmEngine2[2] = z_cg_pos_Fm - eng2_z_pos_Fm;
 
 		//Get thrust of each engine
 		double eng1_thrust = throttle1_inp * mass * g;
@@ -225,14 +250,11 @@ public:
 		Eigen::Vector3d engine1_force_body({ eng1_thrust,0,0 });
 		Eigen::Vector3d engine2_force_body({ eng2_thrust,0,0 });
 
-
 		Eigen::Vector3d momentEng1 = momentArmEngine1.cross(engine1_force_body);
 		Eigen::Vector3d momentEng2 = momentArmEngine2.cross(engine2_force_body);
-		cg_engine_moments_body = momentEng1 + momentEng2;
+		Eigen::Vector3d cg_engine_moments_body = momentEng1 + momentEng2;
 
-
-		total_cg_moments_body = cg_aerodynamic_moments_body + cg_engine_moments_body;
-
+		Eigen::Vector3d total_cg_moments_body = cg_aerodynamic_moments_body + cg_engine_moments_body;
 
 		Eigen::Vector3d x4tox6dot = InverseInertiaMatrix * (total_cg_moments_body - angular_vel_be_body_frame.cross(InertiaMatrix * angular_vel_be_body_frame));
 		
@@ -260,10 +282,9 @@ public:
 
 	double pi{};
 
-	//states
 	double u{}; //u
 	double v{}; //v
-	double w{}; //w
+	double w{};//w
 	double p{}; //p
 	double q{}; //q
 	double r{}; //r
@@ -287,6 +308,7 @@ public:
 	double lt{};
 	double wing_planform_area{};
 	double tail_planform_area{};
+
 
 	double x_cg_pos_Fm{};
 	double y_cg_pos_Fm{};
@@ -332,21 +354,8 @@ public:
 	double coefficient_of_lift_tail{};
 
 
-	//Forces from engine1 and engine2
-	Eigen::Vector3d engine1_force_body{};
-	Eigen::Vector3d engine2_force_body{};
-
 	//Vectors for forces in body axis
-	Eigen::Vector3d gravity_forces_body{};
-	Eigen::Vector3d engine_forces_body{};
-	Eigen::Vector3d aerodynamic_forces_stability{};
 	Eigen::Vector3d aerodynamic_forces_body{};
-	Eigen::Vector3d total_forces_body{};
-
-	
-	//Moment arms
-	Eigen::Vector3d momentArmEngine1{};
-	Eigen::Vector3d momentArmEngine2{};
 
 
 	//Vectors for moments about center of gravity (cg)
@@ -357,11 +366,11 @@ public:
 
 };
 
-Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen::VectorXd& U)
+Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen::VectorXd& U)
 {
 
 	//aircraft is not used yet.
-	
+
 	double pi = std::numbers::pi;
 
 	double u = X[0]; //u
@@ -371,14 +380,35 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	double q = X[4]; //q
 	double r = X[5]; //r
 	double phi = X[6]; //phi
-	double theta = X[7]; //theta
+	const double theta = X[7]; //theta
 	double psi = X[8]; //psi
+
+	Eigen::VectorXd states = aircraft.initializeStates(X);
+	u = states[0];
+	v = states[1];
+	w = states[2];
+	p = states[3];
+	q = states[4];
+	r = states[5];
+	phi = states[6];
+	//theta = states[7];
+	psi = states[8];
+
+
+
 
 	double aileron_inp = U[0];
 	double stabilizer_inp = U[1];
 	double rudder_inp = U[2];
 	double throttle1_inp = U[3];
 	double throttle2_inp = U[4];
+
+	Eigen::VectorXd controls = aircraft.intializeControlInputs(U);
+	aileron_inp = controls[0];
+	stabilizer_inp = controls[1];
+	rudder_inp = controls[2];
+	throttle1_inp = controls[3];
+	throttle2_inp = controls[4];
 
 	////////////////////// Constants ///////////////////
 
@@ -451,7 +481,7 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 
 
 
-	//////////////// Aerodynamic Force Coefficients in stability axis /////////////////////////
+	////////////////// Aerodynamic Force Coefficients in stability axis /////////////////////////
 	
 	//Calculate coefficient of lift for wing body in stability axis
 	double coefficient_of_lift_wb{};
@@ -464,32 +494,26 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	}
 
 
-	//Calculate coefficient of lift for tail in stability axis
+	////Calculate coefficient of lift for tail in stability axis
 	double downwash_angle = depsda * (alpha - alpha_initial);
 	double angle_of_attack_tail = alpha - downwash_angle + stabilizer_inp + 1.3 * q * tail_body_AC_distance / airSpeed;
 	double coefficient_of_lift_tail = 3.1 * (tail_planform_area / wing_planform_area) * angle_of_attack_tail;
-
-
-	//Calculate total lift
-	double total_lift = coefficient_of_lift_wb + coefficient_of_lift_tail;
+	double total_lift = coefficient_of_lift_wb + coefficient_of_lift_tail;	
 	
-
 	//Total drag (not including tail)
 	double total_drag = 0.13 + 0.07 * pow((5.5 * alpha + 0.654), 2);
 
-
-	//Side force
 	double side_force = -1.6 * beta + 0.24 * rudder_inp;
-	
+
 	Eigen::Vector3d aerodynamic_forces_stability({ -total_drag * dynamicPressure * wing_planform_area, side_force * dynamicPressure * wing_planform_area, -total_lift * dynamicPressure * wing_planform_area });
 	
 
 	//We need to rotate aerodynamic forces from the stability frame to the body frame via a rotation matrix
-	Eigen::MatrixXd rot_stab_to_body(3, 3);
-
+	Eigen::Matrix3d rot_stab_to_body(3, 3);
 	rot_stab_to_body << cos(alpha), 0, -sin(alpha),
 					0, 1, 0,
 					sin(alpha), 0, cos(alpha);
+
 
 	Eigen::Vector3d aerodynamic_forces_body = rot_stab_to_body * aerodynamic_forces_stability;
 
@@ -497,6 +521,7 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	//Calculate moments in body frame about center of gravity.
 	double eta11 = -1.4 * beta;
 	double eta21 = -0.59 - (3.1 * (tail_planform_area * tail_body_AC_distance) / (wing_planform_area * mean_aerodynamic_chord)) * (alpha - downwash_angle);
+	//std::cout << "alpha: " << downwash_angle << std::endl;
 	double eta31 = (1 - alpha * (180 / (15 * pi))) * beta;
 	Eigen::Vector3d eta({ eta11, eta21, eta31 });
 	
@@ -509,7 +534,6 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 	Eigen::MatrixXd dCMdx = (mean_aerodynamic_chord / airSpeed) * correctionVec;
 
 
-
 	Eigen::MatrixXd dCMdu(3, 3);
 	dCMdu << -0.6, 0, 0.22,
 		0, (-3.1 * (tail_planform_area * tail_body_AC_distance) / (wing_planform_area * mean_aerodynamic_chord)), 0,
@@ -520,47 +544,48 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 
 
 	Eigen::Vector3d CMac_b = eta + dCMdx * angular_vel_be_body_frame + dCMdu * uVec;
+	//std::cout << "eta" << eta[1] <<  std::endl;
 
 
 	//Normalize to an aerodynamic moments
 	Eigen::Vector3d MAac_b = CMac_b * dynamicPressure * wing_planform_area * mean_aerodynamic_chord;
+	
 
 
-	////Transfer moment to CG
+	//Transfer moment to CG
 	Eigen::Vector3d rcg_b({ x_cg_pos_Fm,y_cg_pos_Fm,z_cg_pos_Fm });
 	Eigen::Vector3d rac_b({ x_aero_pos_Fm,y_aero_pos_Fm,z_aero_pos_Fm });
 	Eigen::Vector3d crossProduct = aerodynamic_forces_body.cross(rcg_b - rac_b);
-
 	Eigen::Vector3d MAcg_b = MAac_b + crossProduct;
+
 
 
 	//Get thrust of each engine
 	double eng1_thrust = throttle1_inp * mass * g;
 	double eng2_thrust = throttle2_inp * mass * g;
-
 	Eigen::Vector3d FE1_b({ eng1_thrust,0,0 });
 	Eigen::Vector3d FE2_b({ eng2_thrust,0,0 });
 	Eigen::Vector3d engine_forces_body = FE1_b + FE2_b;
 	
 	
-
 	//Engine moment due to offset from CG
 	Eigen::Vector3d momentArmEng1({ x_cg_pos_Fm - eng1_x_pos_Fm, eng1_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng1_z_pos_Fm });
 	Eigen::Vector3d momentArmEng2({ x_cg_pos_Fm - eng2_x_pos_Fm, eng2_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng2_z_pos_Fm });
-
 	Eigen::Vector3d momentEng1 = momentArmEng1.cross(FE1_b);
 	Eigen::Vector3d momentEng2 = momentArmEng2.cross(FE2_b);
-
 	Eigen::Vector3d momentsFromEngineCG_body = momentEng1 + momentEng2;
 
 
 
 	////Calculate gravitational forces in body frame. This does not cause a moment.
 	Eigen::Vector3d gravity_body({ -g * sin(theta), g * cos(theta) * sin(phi), g * cos(theta) * cos(phi) });
-	Eigen::Vector3d gravity_forces_body = mass * gravity_body;
+	Eigen::Vector3d gravity_forces_body = aircraft.mass * gravity_body;
+	
+	//std::cout << "Gravity body: " << std::endl;
+	//std::cout << gravity_body << std::endl;
 
 
-	//Inertia matrix
+	//Inertia matrix - the aircrafts own state will take care of the inertia matrices
 	Eigen::Matrix3d inertiaMatrix(3, 3);
 	inertiaMatrix << 40.07, 0, -2.0923,
 		             0, 64, 0,
@@ -577,19 +602,18 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 
 
 
-	////From F_b (all forces resolved in Fb) and calculate the udot, vdot, wdot
-	Eigen::Vector3d forces_body = gravity_forces_body + engine_forces_body + aerodynamic_forces_body;
-	Eigen::Vector3d x1tox3dot = (1 / mass) * forces_body - angular_vel_be_body_frame.cross(translational_vel_body_frame); 
-	//Eigen::Vector3d x1tox3dot = aircraft.forces_body_frame(angular_vel_be_body_frame, translational_vel_body_frame, airSpeed, alpha, beta, dynamicPressure, g, q, theta, phi);
-	std::cout << "x1 to x3 dot: " << x1tox3dot << std::endl;
-	
+	//From F_b (all forces resolved in Fb) and calculate the udot, vdot, wdot
+	//Eigen::Vector3d forces_body = gravity_forces_body + engine_forces_body + aerodynamic_forces_body;
+	Eigen::Vector3d forces_body = gravity_forces_body + aircraft.engine_forces_body_frame(g) + rot_stab_to_body*aircraft.aerodynamic_forces_stability_axis(alpha,beta,airSpeed,dynamicPressure);
+	Eigen::Vector3d x1tox3dot = (1.0 / aircraft.mass) * forces_body - angular_vel_be_body_frame.cross(translational_vel_body_frame); 
 
 
 	//From Mcg_b (all moments about the cog in Fb) and calculate pdot, qdot,rdot
 	Eigen::Vector3d cg_moments_body = MAcg_b + momentsFromEngineCG_body;
 
-	Eigen::Vector3d x4tox6dot = invInertiaMatrix*(cg_moments_body - angular_vel_be_body_frame.cross(inertiaMatrix * angular_vel_be_body_frame));
-	//Eigen::Vector3d x4tox6dot = aircraft.cg_moments_body_frame(angular_vel_be_body_frame, airSpeed, dynamicPressure, alpha, beta,g);
+	//Eigen::Vector3d x4tox6dot = invInertiaMatrix*(cg_moments_body - angular_vel_be_body_frame.cross(inertiaMatrix * angular_vel_be_body_frame));
+	Eigen::Vector3d x4tox6dot = aircraft.cg_moments_body_frame(rot_stab_to_body, angular_vel_be_body_frame, airSpeed, dynamicPressure, alpha, beta,g); //bug
+	
 
 
 
@@ -599,7 +623,8 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 		0, cos(phi), sin(phi),
 		0, sin(phi) / cos(theta), cos(phi) / cos(theta);
 
-	//::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
+
+	//Eigen::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
 	Eigen::Vector3d x7tox9dot = aircraft.euler_angles_euler_kinematics(angular_vel_be_body_frame, phi, theta, psi);
 
 
@@ -622,7 +647,8 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd&& X, Eigen
 
 Eigen::VectorXd RCAM_model_implicit(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::VectorXd& X, Eigen::VectorXd& U) {
 
-	return Aircraft_Sim(ac, std::move(X), U) - XDOT;
+	
+	return Aircraft_Sim(ac, X, U) - XDOT;
 }
 
 void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& dxdot, Eigen::MatrixXd& dx, Eigen::MatrixXd& du)
@@ -650,13 +676,9 @@ void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::Vect
 	Uo[3] = 0.0821;
 	Uo[4] = 0.0821;
 
-	dxdot.setConstant(0.0000000001);
-
-
-	dx.setConstant(0.0000000001);
-
-
-	du.setConstant(0.0000000001);
+	dxdot.setConstant(0.00001);
+	dx.setConstant(0.00001);
+	du.setConstant(0.00001);
 
 }
 
@@ -722,12 +744,19 @@ Eigen::MatrixXd LinearizeSystem_B(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eig
 			u_minus(j) = u_minus(j) - du;
 
 			Eigen::VectorXd F = RCAM_model_implicit(ac,XDOTo, Xo, u_plus);
+
+			std::cout << F << std::endl;
+
 			double F_plus_keep = F[i];
 
 			F = RCAM_model_implicit(ac,XDOTo, Xo, u_minus);
+			
+			std::cout << F << std::endl;
 			double F_minus_keep = F[i];
+			
+			B(i, j) = (F_plus_keep - F_minus_keep) / (2.0 * du);
 
-			B(i, j) = (F_plus_keep - F_minus_keep) / (2 * du);
+
 
 		}
 	}
@@ -1018,26 +1047,27 @@ int main()
 
 	for (int i = 0; i < steps; i++)
 	{
-		Eigen::VectorXd k1 = Aircraft_Sim(ac,nonLinearSolutionMatrix.col(i), initialU);
+		Eigen::VectorXd nextk1 = nonLinearSolutionMatrix.col(i);
+		Eigen::VectorXd k1 = Aircraft_Sim(ac,nextk1, initialU);
 
 		Eigen::VectorXd nextk2 = nonLinearSolutionMatrix.col(i) + (timeIncrement / 2.0) * k1;
-		Eigen::VectorXd k2 = Aircraft_Sim(ac,std::move(nextk2), initialU);
+		Eigen::VectorXd k2 = Aircraft_Sim(ac,nextk2, initialU);
 
 		Eigen::VectorXd nextk3 = nonLinearSolutionMatrix.col(i) + (timeIncrement / 2.0) * k2;
-		Eigen::VectorXd k3 = Aircraft_Sim(ac,std::move(nextk3), initialU);
+		Eigen::VectorXd k3 = Aircraft_Sim(ac,nextk3, initialU);
 
 		Eigen::VectorXd nextk4 = nonLinearSolutionMatrix.col(i) + timeIncrement * k3;
-		Eigen::VectorXd k4 = Aircraft_Sim(ac,std::move(nextk4), initialU);
+		Eigen::VectorXd k4 = Aircraft_Sim(ac,nextk4, initialU);
 
 		nonLinearSolutionMatrix.col(i + 1) = nonLinearSolutionMatrix.col(i) + (timeIncrement / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
 
 	}
-
+	std::cout << nonLinearSolutionMatrix.leftCols(5) << std::endl;
 
 	/*for (int i = 0; i < 10; i++)
 	{
 		Eigen::VectorXd nextStep = solution.col(i);
-		solution.col(i + 1) = solution.col(i) + 0.100 * RCAM_model(std::move(nextStep), initialU);
+		solution.col(i + 1) = solution.col(i) + 0.100 * Aircraft_Sim(ac,std::move(nextStep), initialU);
 	}*/
 
 
@@ -1079,16 +1109,17 @@ int main()
 
 	initializeTrimStatesInputsAndIncrements(Xdoto, Xo, Uo, dxdot, dx, du);
 
+	CivilAircraft acl = CivilAircraft(Xo, Uo);
+
 	std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
-	Eigen::MatrixXd Atest = LinearizeSystem_A(ac,Xdoto, Xo, Uo, dxdot, dx, du);
-	std::cout << Atest << std::endl;
+	Eigen::MatrixXd Atest = LinearizeSystem_A(acl,Xdoto, Xo, Uo, dxdot, dx, du);
+	//std::cout << Atest << std::endl;
 	//std::cout << Atest.eigenvalues() << std::endl;
 
 
-
 	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
-	Eigen::MatrixXd Btest = LinearizeSystem_B(ac,Xdoto, Xo, Uo, dxdot, dx, du);
-	//std::cout << Btest << std::endl;
+	Eigen::MatrixXd Btest = LinearizeSystem_B(acl,Xdoto, Xo, Uo, dxdot, dx, du);
+	std::cout << Btest << std::endl;
 
 
 
