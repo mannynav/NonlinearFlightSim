@@ -5,366 +5,13 @@
 #include <iostream>
 #include <fstream>
 
+#include "Aircraft.h"
+#include "NumericalIntegration.h"
+#include "Output.h"
+
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
 
-class Aircraft
-{
-public:
-
-
-private:
-
-
-};
-
-class CivilAircraft : Aircraft
-{
-public:
-
-	//Constructor for initialization of aircraft constants.
-	CivilAircraft(Eigen::VectorXd& states, Eigen::VectorXd& controls) : pi(std::numbers::pi)
-	{
-
-		u = states[0];
-		v = states[1];
-		w = states[2];
-		p = states[3];
-		q = states[4];
-		r = states[5];
-		phi = states[6];
-		theta = states[7];
-		psi = states[8];
-
-		aileron_inp = controls[0];
-		stabilizer_inp = controls[1];
-		rudder_inp = controls[2];
-		throttle1_inp = controls[3];
-		throttle2_inp = controls[4];
-
-		//aircraft specs
-		mass = 120000;
-		mean_aerodynamic_chord = 6.6;
-		lt = 24.8;
-		wing_planform_area = 260;
-		tail_planform_area = 64;
-
-
-		x_cg_pos_Fm = 0.23 * mean_aerodynamic_chord;
-		y_cg_pos_Fm = 0.0;
-		z_cg_pos_Fm = 0.10 * mean_aerodynamic_chord;
-
-		x_aero_pos_Fm = 0.12 * mean_aerodynamic_chord;
-		y_aero_pos_Fm = 0;
-		z_aero_pos_Fm = 0;
-
-		InertiaMatrix << 40.07, 0, -2.0923,
-			0, 64, 0,
-			-2.0923, 0, 99.2;
-		InertiaMatrix = mass * InertiaMatrix;
-
-		InverseInertiaMatrix << 0.02498, 0, 0.000523,
-			0, 0.015625, 0,
-			0.0005232, 0, 0.010019;
-		InverseInertiaMatrix = (1.0 / mass) * InverseInertiaMatrix;
-
-
-		//Engine applications points of thrust
-		eng1_x_pos_Fm = 0;
-		eng1_y_pos_Fm = -7.94;
-		eng1_z_pos_Fm = -1.9;
-
-		eng2_x_pos_Fm = 0.0;
-		eng2_y_pos_Fm = 7.94;
-		eng2_z_pos_Fm = -1.9;
-
-
-		//Aerodynamic force coefficients in stability axis
-		depsda = 0.25;
-		alpha_initial = -11.5 * (pi / 180);
-		slope_coefficient_of_lift = 5.5;
-		a3 = -768.5;
-		a2 = 609.2;
-		a1 = -155.2;
-		a0 = -15.212;
-		alpha_switch = 14.5 * (pi / 180); //lift slope goes from linear to non-linear
-
-
-
-	}
-
-	Eigen::VectorXd initializeStates(Eigen::VectorXd& stateVector)
-	{
-		//make sure to check size
-		u = stateVector[0];
-		v = stateVector[1];
-		w = stateVector[2];
-		p = stateVector[3];
-		q = stateVector[4];
-		r = stateVector[5];
-		phi = stateVector[6];
-		theta = stateVector[7];
-		psi = stateVector[8];
-		Eigen::VectorXd states(9);
-		states[0] = u;
-		states[1] = v;
-		states[2] = w;
-		states[3] = p;
-		states[4] = q;
-		states[5] = r;
-		states[6] = phi;
-		states[7] = theta;
-		states[8] = psi;
-		return states;
-	}
-
-	Eigen::VectorXd intializeControlInputs(Eigen::VectorXd& controlVector)
-	{
-		//make sure to check size
-		aileron_inp = controlVector[0];
-		stabilizer_inp = controlVector[1];
-		rudder_inp = controlVector[2];
-		throttle1_inp = controlVector[3];
-		throttle2_inp = controlVector[4];
-		
-		Eigen::VectorXd controls(5);
-		controls[0] = aileron_inp;
-		controls[1] = stabilizer_inp;
-		controls[2] = rudder_inp;
-		controls[3] = throttle1_inp;
-		controls[4] = throttle2_inp;
-		return controls;
-	}
-
-	Eigen::Vector3d engine_forces_body_frame(double g)
-	{
-		double engine1_thrust = throttle1_inp * mass * g;
-		double engine2_thrust = throttle2_inp * mass * g;
-
-		Eigen::Vector3d engine1_force_body({ engine1_thrust,0,0 });
-		Eigen::Vector3d engine2_force_body({ engine2_thrust,0,0 });
-		Eigen::Vector3d engine_forces_body = engine1_force_body + engine2_force_body;
-
-		return engine_forces_body;
-	}
-
-	Eigen::Vector3d aerodynamic_forces_stability_axis(double alpha, double beta, double airSpeed, double dynamicPressure)
-	{
-	
-		//Calculate coefficient of lift for wing body in stability axis
-		double coefficient_of_lift_wb{};
-		if (alpha <= alpha_switch)
-		{
-			coefficient_of_lift_wb = slope_coefficient_of_lift * (alpha - alpha_initial);
-		}
-		else {
-			coefficient_of_lift_wb = a3 * pow(alpha, 3) + a2 * pow(alpha, 2) + a1 * alpha + a0;
-		}
-
-
-		//Calculate coefficient of lift for tail in stability axis
-		double downwash_angle = depsda * (alpha - alpha_initial);
-		double angle_of_attack_tail = alpha - downwash_angle + stabilizer_inp + 1.3 * q * lt / airSpeed;
-		double coefficient_of_lift_tail = 3.1 * (tail_planform_area / wing_planform_area) * angle_of_attack_tail;
-
-		double total_lift = coefficient_of_lift_wb + coefficient_of_lift_tail;
-
-
-		//Total drag (not including tail)
-		double total_drag = 0.13 + 0.07 * pow((5.5 * alpha + 0.654), 2);
-		double side_force = -1.6 * beta + 0.24 * rudder_inp;
-
-
-		Eigen::Vector3d aerodynamic_forces_stability({ -total_drag * dynamicPressure * wing_planform_area, side_force * dynamicPressure * wing_planform_area, -total_lift * dynamicPressure * wing_planform_area });
-	
-		return aerodynamic_forces_stability;
-	
-	}
-
-	Eigen::Vector3d aerodynamic_forces_body_frame(double alpha, double beta, double airSpeed, double dynamicPressure, Eigen::Matrix3d& rot_stab_to_body)
-	{
-		//We need to rotate aerodynamic forces from the stability frame to the body frame via a rotation matrix
-		Eigen::Vector3d aerodynamic_forces_body = rot_stab_to_body * aerodynamic_forces_stability_axis(alpha,beta,airSpeed,dynamicPressure);
-
-		return aerodynamic_forces_body;
-
-	}
-
-	//Moments about aircraft center of gravity expressed in the body frame
-	Eigen::Vector3d cg_moments_body_frame(Eigen::Matrix3d& rot_stab_to_body, Eigen::Vector3d& angular_vel_be_body_frame, double airSpeed, double dynamicPressure, double alpha, double beta,double g)
-	{
-		double downwash_angle = depsda * (alpha - alpha_initial);
-		//Calculate moments in body frame about center of gravity.
-		double eta11 = -1.4 * beta;
-		//std::cout << "ac alpha: " << downwash_angle << std::endl;
-		double eta21 = -0.59 - (3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord)) * (alpha - downwash_angle);
-		double eta31 = (1 - alpha * (180 / (15 * pi))) * beta;
-		Eigen::Vector3d eta({ eta11, eta21, eta31 });
-
-
-		Eigen::MatrixXd correctionVec(3, 3);
-		correctionVec << -11, 0, 5,
-			0, (-4.03 * (tail_planform_area * lt * lt) / (wing_planform_area * mean_aerodynamic_chord * mean_aerodynamic_chord)), 0,
-			1.7, 0, -11.5;
-
-		Eigen::MatrixXd dCMdx = (mean_aerodynamic_chord / airSpeed) * correctionVec;
- 
-
-		Eigen::MatrixXd dCMdu(3, 3);
-		dCMdu << -0.6, 0, 0.22,
-			0, (-3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord)), 0,
-			0, 0, -0.63;
-
-
-		Eigen::Vector3d uVec({ aileron_inp,stabilizer_inp,rudder_inp });
-
-
-		Eigen::Vector3d CMac_b = eta + dCMdx * angular_vel_be_body_frame + dCMdu * uVec;
-		//std::cout << " ac eta" << eta[1]<< std::endl;
-
-
-		//Normalize to an aerodynamic moments
-		Eigen::Vector3d MAac_b = CMac_b * dynamicPressure * wing_planform_area * mean_aerodynamic_chord;
-	
-
-
-		////Transfer moment to CG
-		Eigen::Vector3d rcg_b({ x_cg_pos_Fm,y_cg_pos_Fm,z_cg_pos_Fm });
-		Eigen::Vector3d rac_b({ x_aero_pos_Fm,y_aero_pos_Fm,z_aero_pos_Fm });
-		Eigen::Vector3d crossProduct = aerodynamic_forces_body_frame(alpha,beta,airSpeed,dynamicPressure,rot_stab_to_body).cross(rcg_b - rac_b);
-
-		Eigen::Vector3d MAcg_b = MAac_b + crossProduct;
-
-		Eigen::Vector3d cg_aerodynamic_moments_body = (MAac_b + crossProduct);
-
-
-
-		Eigen::Vector3d momentArmEngine1({ x_cg_pos_Fm - eng1_x_pos_Fm, eng1_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng1_z_pos_Fm });
-		Eigen::Vector3d momentArmEngine2({ x_cg_pos_Fm - eng2_x_pos_Fm, eng2_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng2_z_pos_Fm });
-
-
-		//Get thrust of each engine
-		double eng1_thrust = throttle1_inp * mass * g;
-		double eng2_thrust = throttle2_inp * mass * g;
-
-		Eigen::Vector3d engine1_force_body({ eng1_thrust,0,0 });
-		Eigen::Vector3d engine2_force_body({ eng2_thrust,0,0 });
-
-		Eigen::Vector3d momentEng1 = momentArmEngine1.cross(engine1_force_body);
-		Eigen::Vector3d momentEng2 = momentArmEngine2.cross(engine2_force_body);
-		Eigen::Vector3d cg_engine_moments_body = momentEng1 + momentEng2;
-
-		Eigen::Vector3d total_cg_moments_body = cg_aerodynamic_moments_body + cg_engine_moments_body;
-
-		Eigen::Vector3d x4tox6dot = InverseInertiaMatrix * (total_cg_moments_body - angular_vel_be_body_frame.cross(InertiaMatrix * angular_vel_be_body_frame));
-		
-		return x4tox6dot;
-
-	}
-
-	//Euler angles using traditional euler kinematics
-	Eigen::Vector3d euler_angles_euler_kinematics(Eigen::Vector3d& angular_vel_be_body_frame, double phi, double theta, double psi)
-	{
-
-		////Calculate phidot, thetadot, psidot
-		Eigen::Matrix3d H_pi(3, 3);
-		H_pi << 1, sin(phi)* tan(theta), cos(phi)* tan(theta),
-			0, cos(phi), sin(phi),
-			0, sin(phi) / cos(theta), cos(phi) / cos(theta);
-		Eigen::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
-
-		return x7tox9dot;
-
-	}
-
-	//Euler angles using quaternions - to be implemented
-	Eigen::Vector3d euler_angles_quaternion_kinematics() {}
-
-	double pi{};
-
-	double u{}; //u
-	double v{}; //v
-	double w{};//w
-	double p{}; //p
-	double q{}; //q
-	double r{}; //r
-	double phi{}; //phi
-	double theta{}; //theta
-	double psi{}; //psi
-
-
-	//controls
-	double aileron_inp{};
-	double stabilizer_inp{};
-	double rudder_inp{};
-	double throttle1_inp{};
-	double throttle2_inp{};
-
-
-	//aircraft specs
-	double number_of_engines = 2.0;
-	double mass{};
-	double mean_aerodynamic_chord{};
-	double lt{};
-	double wing_planform_area{};
-	double tail_planform_area{};
-
-
-	double x_cg_pos_Fm{};
-	double y_cg_pos_Fm{};
-	double z_cg_pos_Fm{};
-
-	double x_aero_pos_Fm{};
-	double y_aero_pos_Fm{};
-	double z_aero_pos_Fm{};
-
-	Eigen::Matrix3d InertiaMatrix{}; //inertia matrix needed for total_cg_moments_body
-	Eigen::Matrix3d InverseInertiaMatrix{};
-
-
-	//Engine constants
-	double eng1_x_pos_Fm{};
-	double eng1_y_pos_Fm{};
-	double eng1_z_pos_Fm{};
-
-	double eng2_x_pos_Fm{};
-	double eng2_y_pos_Fm{};
-	double eng2_z_pos_Fm{};
-
-
-	//Aerodynamic constants - used for aerodynamic forces in stability axis
-	double depsda{};
-	double alpha_initial{};
-	double slope_coefficient_of_lift{};
-	double a3{};
-	double a2{};
-	double a1{};
-	double a0{};
-	double alpha_switch{}; //lift slope goes from linear to non-linear beyond this angle
-
-
-	//Aerodynamic force coefficients
-	double total_lift{};
-	double total_drag{};
-	double total_side_force{};
-
-	double downwash_angle{};
-	double angle_of_attack_tail{};
-	double coefficient_of_lift_wb{};
-	double coefficient_of_lift_tail{};
-
-
-	//Vectors for forces in body axis
-	Eigen::Vector3d aerodynamic_forces_body{};
-
-
-	//Vectors for moments about center of gravity (cg)
-	Eigen::Vector3d cg_aerodynamic_moments_body{};
-	Eigen::Vector3d cg_engine_moments_body{};
-	Eigen::Vector3d total_cg_moments_body{};
-
-
-};
 
 Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen::VectorXd& U)
 {
@@ -771,278 +418,45 @@ Eigen::VectorXd LinearStateSpace(const Eigen::VectorXd& x, const Eigen::VectorXd
 
 }
 
-Eigen::VectorXd rk4_step_ss(
-	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
-	const VectorXd& x_n,
-	const VectorXd& u_n,
-	double h,
-	const MatrixXd& A,
-	const MatrixXd& B) {
-
-	VectorXd k1 = h * state_space_model(x_n, u_n, A, B);
-	VectorXd k2 = h * state_space_model(x_n + 0.5 * k1, u_n, A, B);
-	VectorXd k3 = h * state_space_model(x_n + 0.5 * k2, u_n, A, B);
-	VectorXd k4 = h * state_space_model(x_n + k3, u_n, A, B);
-
-	return x_n + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
-}
-
-Eigen::MatrixXd rk4_simulate_ss(
-	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
-	const VectorXd& initial_x,
-	const VectorXd& control_input,
-	double start_time,
-	double end_time,
-	double steps,
-	const MatrixXd& A_matrix,
-	const MatrixXd& B_matrix) {
-
-	if (steps <= 0.0) {
-		throw std::invalid_argument("Steps must be positive.");
-	}
-
-	int num_steps = static_cast<int>(steps) + 1;
-	double timeIncrement = end_time / steps;
-
-	Eigen::MatrixXd solution_matrix(4, num_steps);
-	solution_matrix.col(0) = initial_x;
-
-	VectorXd current_x = initial_x;
-	double current_time = start_time;
-
-	for (int i = 1; i < num_steps; ++i) {
-
-		current_x = rk4_step_ss(state_space_model, solution_matrix.col(i - 1), control_input, timeIncrement, A_matrix, B_matrix);
-		solution_matrix.col(i) = current_x;
-		current_time += timeIncrement;
-	}
-
-	return solution_matrix;
-}
-
-Eigen::MatrixXd forward_euler_simulate_ss(
-const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
-const VectorXd& initial_x,
-const VectorXd& control_input,
-double start_time,
-double end_time,
-double steps,
-const MatrixXd& A_matrix,
-const MatrixXd& B_matrix)
+void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
 {
-	if (steps <= 0.0) {
-		throw std::invalid_argument("Steps must be positive.");
-	}
 
-	int num_steps = static_cast<int>(steps) + 1;
-	double timeIncrement = end_time / steps;
+	states[0] = 85;
+	states[1] = 0.0;
+	states[2] = 0.0;
+	states[3] = 0.0;
+	states[4] = 0.0;
+	states[5] = 0.0;
+	states[6] = 0.0;
+	states[7] = 0.1;
+	states[8] = 0.0;
 
-	Eigen::MatrixXd solution_matrix(initial_x.size(), num_steps);
-	solution_matrix.col(0) = initial_x;
-
-	VectorXd current_x = initial_x;
-	double current_time = start_time;
-
-
-	for (int i = 0; i < steps; i++)
-	{
-		solution_matrix.col(i + 1) = solution_matrix.col(i) + timeIncrement * state_space_model(solution_matrix.col(i), control_input, A_matrix, B_matrix);
-
-	}
-
-	return solution_matrix;
-
+	controls[0] = 0.0;
+	controls[1] = -0.1;
+	controls[2] = 0.0;
+	controls[3] = 0.08;
+	controls[4] = 0.08;
 }
-
-
-
-
-// Butcher tableau for embedded Runge-Kutta method (e.g., Dormand-Prince 4(5))
-struct RKTableauSS {
-	Eigen::MatrixXd a;
-	Eigen::VectorXd b;   // Coefficients for the higher-order method
-	Eigen::VectorXd b_alt; // Coefficients for the lower-order embedded method
-	Eigen::VectorXd c;
-};
-
-
-// Dormand-Prince 4(5) tableau
-RKTableauSS dp45_tableau_ss() {
-	RKTableauSS tableau;
-	tableau.a.resize(7, 6);
-	tableau.b.resize(7);
-	tableau.b_alt.resize(7);
-	tableau.c.resize(7);
-
-	tableau.c << 0.0, 0.2, 0.3, 0.8, 8.0 / 9.0, 1.0, 1.0;
-
-	tableau.a <<
-		0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-		0.2, 0.0, 0.0, 0.0, 0.0, 0.0,
-		3.0 / 40.0, 9.0 / 40.0, 0.0, 0.0, 0.0, 0.0,
-		44.0 / 45.0, -56.0 / 15.0, 32.0 / 9.0, 0.0, 0.0, 0.0,
-		19372.0 / 6561.0, -25360.0 / 2187.0, 64448.0 / 6561.0, -212.0 / 729.0, 0.0, 0.0,
-		9017.0 / 3168.0, -355.0 / 33.0, 46732.0 / 5247.0, 49.0 / 176.0, -5103.0 / 18656.0, 0.0,
-		35.0 / 384.0, 0.0, 500.0 / 1113.0, 125.0 / 192.0, -2187.0 / 2565.0, 11.0 / 84.0;
-
-	tableau.b << 35.0 / 384.0, 0.0, 500.0 / 1113.0, 125.0 / 192.0, -2187.0 / 2565.0, 11.0 / 84.0, 0.0;
-	tableau.b_alt << 5179.0 / 57600.0, 0.0, 7571.0 / 16695.0, 393.0 / 640.0, -92097.0 / 339200.0, 187.0 / 2100.0, 1.0 / 40.0;
-
-	return tableau;
-}
-
-
-std::pair<VectorXd, double> adaptive_rk_step_ss(
-	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
-	const VectorXd& x_n,
-	double t_n,
-	double h,
-	double tolerance,
-	const RKTableauSS& tableau,
-	const VectorXd& u_n, // Current control input
-	const MatrixXd& A,
-	const MatrixXd& B) {
-
-	int s = tableau.a.rows();
-	Eigen::MatrixXd k(x_n.size(), s);
-
-	for (int i = 0; i < s; ++i) {
-		VectorXd sum_ak = VectorXd::Zero(x_n.size());
-		for (int j = 0; j < i; ++j) {
-			sum_ak += tableau.a(i, j) * k.col(j);
-		}
-		k.col(i) = state_space_model(x_n + h * sum_ak, u_n, A, B);
-	}
-
-	VectorXd x_np1 = x_n;
-	for (int i = 0; i < s; ++i) {
-		x_np1 += h * tableau.b(i) * k.col(i);
-	}
-
-	VectorXd x_np1_alt = x_n;
-	for (int i = 0; i < s; ++i) {
-		x_np1_alt += h * tableau.b_alt(i) * k.col(i);
-	}
-
-	VectorXd error_estimate = (x_np1 - x_np1_alt).cwiseAbs();
-	double error_norm = error_estimate.maxCoeff(); // Using max norm
-
-	double safety_factor = 0.9;
-	double p = tableau.b.size() - 1; // Order of the higher method
-
-	double h_new;
-	if (error_norm <= tolerance) {
-		h_new = h * safety_factor * std::pow(tolerance / error_norm, 1.0 / (p + 1));
-		return { x_np1, h_new };
-	}
-	else {
-		h_new = h * safety_factor * std::pow(tolerance / error_norm, 1.0 / p);
-		return { x_n, -std::abs(h_new) }; // Negative h_new indicates rejection
-	}
-}
-
-
-
-Eigen::MatrixXd adaptive_rk_simulate_ss(
-	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
-	VectorXd initial_x,
-	const VectorXd& control_input,
-	double start_time,
-	double end_time,
-	double initial_step_size,
-	double tolerance,
-	const RKTableauSS& tableau,
-	const MatrixXd& A_matrix,
-	const MatrixXd& B_matrix) {
-
-	if (initial_step_size <= 0.0 || tolerance <= 0.0) {
-		throw std::invalid_argument("Initial step size and tolerance must be positive.");
-	}
-
-	std::vector<VectorXd> solution_points;
-	std::vector<double> time_points;
-
-	solution_points.push_back(initial_x);
-	time_points.push_back(start_time);
-
-	VectorXd current_x = initial_x;
-	double current_time = start_time;
-	double h = initial_step_size;
-
-	while (current_time < end_time) {
-		if (current_time + h > end_time) {
-			h = end_time - current_time;
-		}
-
-		VectorXd current_u = control_input;
-		std::pair<VectorXd, double> result = adaptive_rk_step_ss(state_space_model, current_x, current_time, h, tolerance, tableau, current_u, A_matrix, B_matrix);
-		VectorXd next_x = result.first;
-		double h_new = result.second;
-
-		if (h_new > 0) {
-			solution_points.push_back(next_x);
-			time_points.push_back(current_time + h);
-			current_x = next_x;
-			current_time += h;
-			h = h_new;
-		}
-		else {
-			h = -h_new; // Retry with the smaller step size
-		}
-
-		if (h < std::numeric_limits<double>::epsilon() * std::abs(current_time)) {
-			std::cerr << "Warning: Step size became too small. Simulation might not converge." << std::endl;
-			break;
-		}
-	}
-
-	Eigen::MatrixXd solution_matrix(initial_x.size(), solution_points.size());
-	for (size_t i = 0; i < solution_points.size(); ++i) {
-		solution_matrix.col(i) = solution_points[i];
-	}
-
-	return solution_matrix;
-}
-
-
-
-
-
 
 int main()
-
 {
+
+	Eigen::VectorXd initialX(9); //Initial states for non linear simulation
+	Eigen::VectorXd initialU(5); //Initial controls for nonlinear simlulation. Controls will be dependent on aircraft/object - 1 engine, 2 engine, etc
+	initialStatesControls(initialX, initialU);
+
 	
-
-	Eigen::VectorXd initialX(9);
-	initialX[0] = 85;
-	initialX[1] = 0.0;
-	initialX[2] = 0.0;
-	initialX[3] = 0.0;
-	initialX[4] = 0.0;
-	initialX[5] = 0.0;
-	initialX[6] = 0.0;
-	initialX[7] = 0.1;
-	initialX[8] = 0.0;
-
-
-	Eigen::VectorXd initialU(5);
-	initialU[0] = 0.0;
-	initialU[1] = -0.1;
-	initialU[2] = 0.0;
-	initialU[3] = 0.08;
-	initialU[4] = 0.08;
-
-
-	CivilAircraft ac = CivilAircraft(initialX, initialU);
+	CivilAircraft ac = CivilAircraft(initialX, initialU); 
 
 	double simLength = 150;
 	double steps = 200;
 	double timeIncrement = simLength / steps;
 
-	Eigen::MatrixXd nonLinearSolutionMatrix(9, 201);
-	nonLinearSolutionMatrix.setZero();
-	nonLinearSolutionMatrix.col(0) = initialX;
+	int rows = initialX.size();
+	int time_steps = steps + 1;
+
+	Eigen::MatrixXd nonLinearSolutionMatrix(rows, time_steps);
+	nonLinearSolutionMatrix.setZero().col(0) = initialX;
 
 
 	for (int i = 0; i < steps; i++)
@@ -1064,31 +478,14 @@ int main()
 	}
 	std::cout << nonLinearSolutionMatrix.leftCols(5) << std::endl;
 
-	/*for (int i = 0; i < 10; i++)
+	/*for (int i = 0; i < steps; i++)
 	{
-		Eigen::VectorXd nextStep = solution.col(i);
-		solution.col(i + 1) = solution.col(i) + 0.100 * Aircraft_Sim(ac,std::move(nextStep), initialU);
+		Eigen::VectorXd nextStep = nonLinearSolutionMatrix.col(i);
+		nonLinearSolutionMatrix.col(i + 1) = nonLinearSolutionMatrix.col(i) + 0.100 * Aircraft_Sim(ac,nextStep, initialU);
 	}*/
 
-
-	// --- Write the non linear solution matrix to a CSV file ---
-	std::ofstream outputFile("non linear solution.csv");
-	if (outputFile.is_open()) {
-		for (int i = 0; i < nonLinearSolutionMatrix.rows(); ++i) {
-			for (int j = 0; j < nonLinearSolutionMatrix.cols(); ++j) {
-				outputFile << nonLinearSolutionMatrix(i, j);
-				if (j < nonLinearSolutionMatrix.cols() - 1) {
-					outputFile << ","; // Add a comma as a separator
-				}
-			}
-			outputFile << "\n"; // Add a newline character for the next row
-		}
-		outputFile.close();
-		std::cout << "non linear solution written to solution.csv" << std::endl;
-	}
-	else {
-		std::cerr << "Unable to open file for writing." << std::endl;
-	}
+	std::string fileName = "Non Linear Solution.csv";
+	outputToFile(nonLinearSolutionMatrix, fileName);
 
 	std::cout << "----------------------------------------- End of non linear simulation -------------------------------------------------" << std::endl;
 
@@ -1113,8 +510,6 @@ int main()
 
 	std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd Atest = LinearizeSystem_A(acl,Xdoto, Xo, Uo, dxdot, dx, du);
-	//std::cout << Atest << std::endl;
-	//std::cout << Atest.eigenvalues() << std::endl;
 
 
 	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
@@ -1190,7 +585,7 @@ int main()
 
 
 	// Get the Dormand-Prince tableau
-	RKTableauSS tableau_ss = dp45_tableau_ss();
+	//RKTableauSS tableau_ss = dp45_tableau_ss();
 	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func = LinearStateSpace;
 
 	Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 150, Alongitudinal, Blongitudinal);
@@ -1201,27 +596,8 @@ int main()
 
 	std::cout << "----------------------------------------- End of simulation for Longitudinal Model -------------------------------------------------" << std::endl;
 
-
-	// --- Write the non linear solution matrix to a CSV file ---
-	std::ofstream outFile("Linear_Longitudinal_Solution.csv");
-	if (outFile.is_open()) {
-		for (int i = 0; i < solution_linear_long.rows(); ++i) {
-			for (int j = 0; j < solution_linear_long.cols(); ++j) {
-				outFile << solution_linear_long(i, j);
-				if (j < solution_linear_long.cols() - 1) {
-					outFile << ","; // Add a comma as a separator
-				}
-			}
-			outFile << "\n"; // Add a newline character for the next row
-		}
-		outFile.close();
-		std::cout << "Linear Longitudinal solution matrix written to csv" << std::endl;
-	}
-	else {
-		std::cerr << "Unable to open file for writing." << std::endl;
-	}
-
-
+	fileName = "Linear Longitudinal Solution.csv";
+	outputToFile(solution_linear_long, fileName);
 
 	return 0;
 
