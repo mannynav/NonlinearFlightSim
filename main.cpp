@@ -292,7 +292,7 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen:
 
 }
 
-Eigen::VectorXd RCAM_model_implicit(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::VectorXd& X, Eigen::VectorXd& U) {
+Eigen::VectorXd Implicit_Model(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::VectorXd& X, Eigen::VectorXd& U) {
 
 	
 	return Aircraft_Sim(ac, X, U) - XDOT;
@@ -352,10 +352,10 @@ Eigen::MatrixXd LinearizeSystem_A(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eig
 			x_plus(j) = x_plus(j) + dx;
 			x_minus(j) = x_minus(j) - dx;
 
-			Eigen::VectorXd F = RCAM_model_implicit(ac,XDOTo, x_plus, Uo);
+			Eigen::VectorXd F = Implicit_Model(ac,XDOTo, x_plus, Uo);
 			double F_plus_keep = F[i];
 
-			F = RCAM_model_implicit(ac,XDOTo, x_minus, Uo);
+			F = Implicit_Model(ac,XDOTo, x_minus, Uo);
 			double F_minus_keep = F[i];
 
 			A(i, j) = (F_plus_keep - F_minus_keep) / (2 * dx);
@@ -390,13 +390,13 @@ Eigen::MatrixXd LinearizeSystem_B(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eig
 			u_plus(j) = u_plus(j) + du;
 			u_minus(j) = u_minus(j) - du;
 
-			Eigen::VectorXd F = RCAM_model_implicit(ac,XDOTo, Xo, u_plus);
+			Eigen::VectorXd F = Implicit_Model(ac,XDOTo, Xo, u_plus);
 
 			std::cout << F << std::endl;
 
 			double F_plus_keep = F[i];
 
-			F = RCAM_model_implicit(ac,XDOTo, Xo, u_minus);
+			F = Implicit_Model(ac,XDOTo, Xo, u_minus);
 			
 			std::cout << F << std::endl;
 			double F_minus_keep = F[i];
