@@ -595,9 +595,66 @@ int main()
 
 
 	std::cout << "----------------------------------------- End of simulation for Longitudinal Model -------------------------------------------------" << std::endl;
-
+	
 	fileName = "Linear Longitudinal Solution.csv";
 	outputToFile(solution_linear_long, fileName);
+
+
+
+
+	std::cout << "----------------------------------------- Start Lateral Model Process -------------------------------------------------" << std::endl;
+	Eigen::MatrixXd Alateral = transformedA.block(4,4, 4,4);
+
+	std::cout << "Alateral: " << std::endl;
+	std::cout << Alateral << std::endl;
+
+
+	Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
+	std::cout << "Blateral: " << std::endl;
+	std::cout << Blateral << std::endl;
+
+	Eigen::MatrixXd Clateral(4, 4);
+	Clongitudinal.setIdentity();
+
+	Eigen::MatrixXd Dlateral(4, 5);
+	Dlongitudinal.setZero();
+
+
+	std::cout << "--------------------- Initialize Xlong and Ulong for Lateral Model ------------------------------ " << std::endl;
+
+	Eigen::VectorXd Xlateral_o(4); 
+	Xlateral_o[0] = -1.99;
+	Xlateral_o[1] = 0.183;
+	Xlateral_o[2] = -0.0038;
+	Xlateral_o[3] = 0.0038;
+
+	Eigen::VectorXd Ulateral_o(5); //Initialize control inputs. Constant of 0 for now.
+	Ulateral_o.setZero();
+
+
+	std::cout << "--------------------- State space simulation For Lateral Model ------------------------------ " << std::endl;
+
+	simTime = 200;
+	stepsLong = 250;
+	increment = simTime / stepsLong;
+
+
+	// Get the Dormand-Prince tableau
+	//RKTableauSS tableau_ss = dp45_tableau_ss();
+	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func_lateral = LinearStateSpace;
+
+	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, Ulateral_o, 0, 150, 150, Alateral, Blateral);
+	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
+	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
+	std::cout << solution_linear_lateral.leftCols(5) << std::endl;
+
+
+	fileName = "Linear Lateral Solution.csv";
+	outputToFile(solution_linear_lateral, fileName);
+
+
+
+
 
 	return 0;
 
