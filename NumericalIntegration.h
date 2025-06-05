@@ -67,7 +67,7 @@ Eigen::VectorXd rk4_step_ss(
 Eigen::MatrixXd rk4_simulate_ss(
 	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
 	const VectorXd& initial_x,
-	const VectorXd& control_input,
+	const MatrixXd& control_input,
 	double start_time,
 	double end_time,
 	double steps,
@@ -87,9 +87,13 @@ Eigen::MatrixXd rk4_simulate_ss(
 	VectorXd current_x = initial_x;
 	double current_time = start_time;
 
+	
+
 	for (int i = 1; i < num_steps; ++i) {
 
-		current_x = rk4_step_ss(state_space_model, solution_matrix.col(i - 1), control_input, timeIncrement, A_matrix, B_matrix);
+		Eigen::VectorXd control_vector_increment = control_input.col(i - 1);
+
+		current_x = rk4_step_ss(state_space_model, solution_matrix.col(i - 1), control_vector_increment, timeIncrement, A_matrix, B_matrix);
 		solution_matrix.col(i) = current_x;
 		current_time += timeIncrement;
 	}
@@ -101,7 +105,6 @@ Eigen::MatrixXd rk4_simulate_ss(
 
 
 //4th order adaptive RK scheme
-
 // Butcher tableau for embedded Runge-Kutta method (e.g., Dormand-Prince 4(5))
 struct RKTableauSS {
 	Eigen::MatrixXd a;
@@ -109,7 +112,6 @@ struct RKTableauSS {
 	Eigen::VectorXd b_alt; // Coefficients for the lower-order embedded method
 	Eigen::VectorXd c;
 };
-
 
 // Dormand-Prince 4(5) tableau
 RKTableauSS dp45_tableau_ss() {

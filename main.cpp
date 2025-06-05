@@ -1,6 +1,7 @@
 
 
 #include <Eigen/Dense>
+#include <Eigen/Eigenvalues> // Include Eigen's Eigenvalues module for eigenvalue and eigenvector computation
 #include <numbers>
 #include <iostream>
 #include <fstream>
@@ -440,6 +441,9 @@ void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
 
 int main()
 {
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Initialization of non linear simulation
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	Eigen::VectorXd initialX(9); //Initial states for non linear simulation
 	Eigen::VectorXd initialU(5); //Initial controls for nonlinear simlulation. Controls will be dependent on aircraft/object - 1 engine, 2 engine, etc
@@ -458,6 +462,10 @@ int main()
 	Eigen::MatrixXd nonLinearSolutionMatrix(rows, time_steps);
 	nonLinearSolutionMatrix.setZero().col(0) = initialX;
 
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Start non linear simulation
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	for (int i = 0; i < steps; i++)
 	{
@@ -484,8 +492,18 @@ int main()
 		nonLinearSolutionMatrix.col(i + 1) = nonLinearSolutionMatrix.col(i) + 0.100 * Aircraft_Sim(ac,nextStep, initialU);
 	}*/
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// End of non linear simulation
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Output results to csv fil
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	std::string fileName = "Non Linear Solution.csv";
 	outputToFile(nonLinearSolutionMatrix, fileName);
+
 
 	std::cout << "----------------------------------------- End of non linear simulation -------------------------------------------------" << std::endl;
 
@@ -493,6 +511,10 @@ int main()
 
 
 	std::cout << "----------------------------------------- Initializing trim point for Xo and Uo (Get from Matlab) -------------------------------------------------" << std::endl;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Initialize structures and matrices for linearization about straight and level trim
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	//Vectors for states and inputs
 	Eigen::VectorXd Xdoto(9);
@@ -508,8 +530,15 @@ int main()
 
 	CivilAircraft acl = CivilAircraft(Xo, Uo);
 
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Linearize system to obtain A and B
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd Atest = LinearizeSystem_A(acl,Xdoto, Xo, Uo, dxdot, dx, du);
+	std::cout << "Eigenvalues of A: " << std::endl;
+	std::cout << Atest.eigenvalues() << std::endl;
 
 
 	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
@@ -518,10 +547,14 @@ int main()
 
 
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Start of longitudinal model process
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	std::cout << "----------------------------------------- Start Longitudinal Model Process -------------------------------------------------" << std::endl;
 
 	std::cout << "----------------------------------------- Initialize S for similarity transformation, compute transformed A and B -------------------------------------------------" << std::endl;
-	Eigen::MatrixXd S(9, 9);
+	Eigen::MatrixXd S(9, 9); //Matrix for similarity transformation of states
 	S.setZero();
 
 	S << 1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -533,8 +566,6 @@ int main()
 		0, 0, 0, 0, 0, 1, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 1, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 1;
-
-	std::cout << S << std::endl;
 
 	Eigen::MatrixXd T = S.inverse();
 
@@ -554,6 +585,15 @@ int main()
 	std::cout << "A long: " << std::endl;
 	std::cout << Alongitudinal << std::endl;
 
+	std::cout << "Eigenvalues of A long: " << std::endl;
+	std::cout << Alongitudinal.eigenvalues() << std::endl;
+
+	Eigen::EigenSolver<Eigen::MatrixXd> eigenSolver(Alongitudinal); // Use EigenSolver to compute eigenvalues and eigenvectors
+	std::cout << "Eigenvectors of A long: " << std::endl;
+	std::cout << eigenSolver.eigenvectors() << std::endl;
+
+	
+
 	std::cout << "B long: " << std::endl;
 	std::cout << Blongitudinal << std::endl;
 
@@ -564,34 +604,89 @@ int main()
 	Dlongitudinal.setZero();
 
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Initialize states and controls for longitudinal model
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	std::cout << "--------------------- Initialize Xlong and Ulong for Longitudinal Model ------------------------------ " << std::endl;
 
-	Eigen::VectorXd Xlong_o(4); //Phugoid.
-	Xlong_o[0] = -1.99;
-	Xlong_o[1] = 0.183;
-	Xlong_o[2] = -0.0038;
-	Xlong_o[3] = 0.0038;
+	double simTime = 150;
+	double stepsLong = 150;
+	double increment = simTime / stepsLong;
 
+
+	//Eigen::VectorXd Xlong_o(4); //Phugoid.
+	//Xlong_o[0] = -1.99;
+	//Xlong_o[1] = 0.183;
+	//Xlong_o[2] = -0.0038;
+	//Xlong_o[3] = 0.0038;
+
+
+	//Eigen::VectorXd Xlong_o(4); //Short period
+	//Xlong_o[0] = 0.03;
+	//Xlong_o[1] = 1.99;
+	//Xlong_o[2] = -1.0048;
+	//Xlong_o[3] = 0.0199;
+
+
+	Eigen::VectorXd Xlong_o(4); //Test Doublet
+	Xlong_o[0] = 0.0;
+	Xlong_o[1] = 0.0;
+	Xlong_o[2] = 0.0;
+	Xlong_o[3] = 0.0;
+
+
+
+	int number_of_controls = 5;
 	Eigen::VectorXd Ulong_o(5); //Initialize inputs. Constant of 0 for now.
 	Ulong_o.setZero();
 
+	Eigen::MatrixXd Ulong_inputs(number_of_controls, int(stepsLong) + 1);
+	Ulong_inputs.setZero();
+
+	
+	// Define the degrees for stabilizer
+	double stabilizer_pos_deg = 10.0;
+	double stabilizer_neg_deg = -10.0;
+
+	// Convert degrees to radians
+	double stabilizer_pos_rad = stabilizer_pos_deg * (3.14 / 180.0);
+	double stabilizer_neg_rad = stabilizer_neg_deg * (3.14 / 180.0);
+
+	// Duration of each phase in seconds (10 seconds for each stabilizer position change)
+	double phase_duration = 10.0;
+
+
+	// Apply the desired stabilizer profile (index 1 for stabilizer)
+	for (int i = 0; i <= stepsLong; ++i) {
+		double current_time = i * increment;
+
+		if (current_time >= 0 && current_time < phase_duration) {
+			// First 5 seconds: 10 degrees stabilizer
+			Ulong_inputs(1, i) = stabilizer_pos_rad;
+		}
+		else if (current_time >= phase_duration && current_time < 2 * phase_duration) {
+			// Next 5 seconds: -10 degrees stabilizer
+			Ulong_inputs(1, i) = stabilizer_neg_rad;
+		}
+		
+	}
 
 
 	std::cout << "--------------------- State space simulation For Longitudinal Model ------------------------------ " << std::endl;
-
-	double simTime = 200;
-	double stepsLong = 250;
-	double increment = simTime / stepsLong;
-
 
 	// Get the Dormand-Prince tableau
 	//RKTableauSS tableau_ss = dp45_tableau_ss();
 	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func = LinearStateSpace;
 
-	Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 150, Alongitudinal, Blongitudinal);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Start state space longitudinal model sim
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, Ulong_inputs, 0, simTime, stepsLong, Alongitudinal, Blongitudinal);
 	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
 	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
-	std::cout << solution_linear_long.leftCols(5) << std::endl;
 
 
 	std::cout << "----------------------------------------- End of simulation for Longitudinal Model -------------------------------------------------" << std::endl;
@@ -607,7 +702,12 @@ int main()
 
 	std::cout << "Alateral: " << std::endl;
 	std::cout << Alateral << std::endl;
+	std::cout << "A lateral eigenvalues: " << std::endl;
+	std::cout << Alateral.eigenvalues() << std::endl;
 
+	Eigen::EigenSolver<Eigen::MatrixXd> eigenSolverLateral (Alateral); // Use EigenSolver to compute eigenvalues and eigenvectors
+	std::cout << "Eigenvectors of A lateral: " << std::endl;
+	std::cout << eigenSolverLateral.eigenvectors() << std::endl;
 
 	Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
 	std::cout << "Blateral: " << std::endl;
@@ -622,31 +722,29 @@ int main()
 
 	std::cout << "--------------------- Initialize Xlong and Ulong for Lateral Model ------------------------------ " << std::endl;
 
+	double lateral_sim_time = 200;
+	double lateral_steps = 250;
+	double lateral_increment = simTime / lateral_steps;
+
 	Eigen::VectorXd Xlateral_o(4); 
 	Xlateral_o[0] = -1.99;
 	Xlateral_o[1] = 0.183;
 	Xlateral_o[2] = -0.0038;
 	Xlateral_o[3] = 0.0038;
 
-	Eigen::VectorXd Ulateral_o(5); //Initialize control inputs. Constant of 0 for now.
-	Ulateral_o.setZero();
+	Eigen::MatrixXd ULateral_inputs(number_of_controls, int(lateral_steps) + 1);
+	ULateral_inputs.setZero();
 
 
 	std::cout << "--------------------- State space simulation For Lateral Model ------------------------------ " << std::endl;
-
-	simTime = 200;
-	stepsLong = 250;
-	increment = simTime / stepsLong;
-
 
 	// Get the Dormand-Prince tableau
 	//RKTableauSS tableau_ss = dp45_tableau_ss();
 	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func_lateral = LinearStateSpace;
 
-	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, Ulateral_o, 0, 150, 150, Alateral, Blateral);
+	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, ULateral_inputs, 0, lateral_sim_time, lateral_steps, Alateral, Blateral);
 	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
 	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
-	std::cout << solution_linear_lateral.leftCols(5) << std::endl;
 
 
 	fileName = "Linear Lateral Solution.csv";
