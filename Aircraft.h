@@ -141,6 +141,28 @@ public:
 		return controls;
 	}
 
+	void initialize_deflections(int U_index, Eigen::MatrixXd& U_inputs, double pos_def_deg, double neg_def_deg, double phase_time1, double phase_time2, double steps, double increment)
+	{
+		// Convert degrees to radians
+		double pos_rad = pos_def_deg * (3.14 / 180.0);
+		double neg_rad = neg_def_deg * (3.14 / 180.0);
+
+		// Apply the desired stabilizer profile (index 1 for stabilizer)
+		for (int i = 0; i <= steps; ++i) {
+			double current_time = i * increment;
+
+			if (current_time >= 0 && current_time < phase_time1) {
+				
+				U_inputs(U_index, i) = pos_rad;
+			}
+			else if (current_time >= phase_time1 && current_time < 2 * phase_time2) {
+				
+				U_inputs(U_index, i) = neg_rad;
+			}
+		}
+	}
+
+
 	Eigen::Vector3d engine_forces_body_frame(double g)
 	{
 		double engine1_thrust = throttle1_inp * mass * g;

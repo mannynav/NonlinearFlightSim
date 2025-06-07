@@ -638,39 +638,14 @@ int main()
 
 
 	int number_of_controls = 5;
-	Eigen::VectorXd Ulong_o(5); //Initialize inputs. Constant of 0 for now.
-	Ulong_o.setZero();
-
 	Eigen::MatrixXd Ulong_inputs(number_of_controls, int(stepsLong) + 1);
 	Ulong_inputs.setZero();
 
-	
-	// Define the degrees for stabilizer
-	double stabilizer_pos_deg = 10.0;
-	double stabilizer_neg_deg = -10.0;
-
-	// Convert degrees to radians
-	double stabilizer_pos_rad = stabilizer_pos_deg * (3.14 / 180.0);
-	double stabilizer_neg_rad = stabilizer_neg_deg * (3.14 / 180.0);
-
-	// Duration of each phase in seconds (10 seconds for each stabilizer position change)
-	double phase_duration = 10.0;
+	acl.initialize_deflections(0, Ulong_inputs,0, 0, 0, 0, stepsLong, increment); //initialize aileron
+	acl.initialize_deflections(1, Ulong_inputs,10, -20, 10, 10, stepsLong, increment); //initialize stabilizer
+	acl.initialize_deflections(2, Ulong_inputs,0,0,0,0,stepsLong, increment); //initialize rudder
 
 
-	// Apply the desired stabilizer profile (index 1 for stabilizer)
-	for (int i = 0; i <= stepsLong; ++i) {
-		double current_time = i * increment;
-
-		if (current_time >= 0 && current_time < phase_duration) {
-			// First 5 seconds: 10 degrees stabilizer
-			Ulong_inputs(1, i) = stabilizer_pos_rad;
-		}
-		else if (current_time >= phase_duration && current_time < 2 * phase_duration) {
-			// Next 5 seconds: -10 degrees stabilizer
-			Ulong_inputs(1, i) = stabilizer_neg_rad;
-		}
-		
-	}
 
 
 	std::cout << "--------------------- State space simulation For Longitudinal Model ------------------------------ " << std::endl;
