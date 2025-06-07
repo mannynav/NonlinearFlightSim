@@ -2,9 +2,8 @@
 
 
 
-/// <summary>
+
 /// This class will be used a base class for aircraft or objects that will be simulated. 
-/// </summary>
 
 class Aircraft
 {
@@ -19,9 +18,7 @@ private:
 
 
 
-/// <summary>
 /// Non-linear Civil Aircraft Model with 5 controls
-/// </summary>
 
 class CivilAircraft : Aircraft
 {
@@ -169,7 +166,6 @@ public:
 			throw std::out_of_range("U_index in initialize_thrusters must be either 3 or 4");
 		}
 	
-		
 		double thrust = thrust_value;
 
 		for (int i = 0; i <= steps; ++i) {
@@ -181,7 +177,6 @@ public:
 			}
 		}
 	}
-
 
 	Eigen::Vector3d engine_forces_body_frame(double g)
 	{

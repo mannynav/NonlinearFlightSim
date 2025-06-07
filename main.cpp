@@ -587,16 +587,8 @@ int main()
 	std::cout << "Eigenvectors of A long: " << std::endl;
 	std::cout << eigenSolver.eigenvectors() << std::endl;
 
-	
-
 	std::cout << "B long: " << std::endl;
 	std::cout << Blongitudinal << std::endl;
-
-	Eigen::MatrixXd Clongitudinal(4, 4);
-	Clongitudinal.setIdentity();
-
-	Eigen::MatrixXd Dlongitudinal(4, 5);
-	Dlongitudinal.setZero();
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -634,10 +626,8 @@ int main()
 	acl.initialize_deflections(0, Ulong_inputs,0,0,0,0,stepsLong, increment); //initialize aileron
 	acl.initialize_deflections(1, Ulong_inputs,10,-10,10,10,stepsLong, increment); //initialize stabilizer
 	acl.initialize_deflections(2, Ulong_inputs,0,0,0,0,stepsLong, increment); //initialize rudder
-	acl.initialize_thrusters(3, Ulong_inputs, 0.1, 40, stepsLong, increment); //thruster 1
-	acl.initialize_thrusters(4, Ulong_inputs, 0.1, 40, stepsLong, increment); //thruster 2
-
-
+	acl.initialize_thrusters(3, Ulong_inputs, 0.5, 60, stepsLong, increment); //thruster 1
+	acl.initialize_thrusters(4, Ulong_inputs, 0.5, 60, stepsLong, increment); //thruster 2
 
 
 	std::cout << "--------------------- State space simulation For Longitudinal Model ------------------------------ " << std::endl;
@@ -679,12 +669,6 @@ int main()
 	Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
 	std::cout << "Blateral: " << std::endl;
 	std::cout << Blateral << std::endl;
-
-	Eigen::MatrixXd Clateral(4, 4);
-	Clongitudinal.setIdentity();
-
-	Eigen::MatrixXd Dlateral(4, 5);
-	Dlongitudinal.setZero();
 
 
 	std::cout << "--------------------- Initialize Xlong and Ulong for Lateral Model ------------------------------ " << std::endl;
