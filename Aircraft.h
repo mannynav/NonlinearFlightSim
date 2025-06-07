@@ -164,11 +164,14 @@ public:
 
 	void initialize_thrusters(int U_index, Eigen::MatrixXd& U_inputs, double thrust_value, double phase_time, double steps, double increment)
 	{
+		if(U_index != 3 && U_index != 4)
+		{
+			throw std::out_of_range("U_index in initialize_thrusters must be either 3 or 4");
+		}
 	
-		// Convert degrees to radians
+		
 		double thrust = thrust_value;
 
-		// Apply the desired stabilizer profile (index 1 for stabilizer)
 		for (int i = 0; i <= steps; ++i) {
 			double current_time = i * increment;
 
