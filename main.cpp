@@ -301,9 +301,7 @@ Eigen::VectorXd Implicit_Model(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::
 
 void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& dxdot, Eigen::MatrixXd& dx, Eigen::MatrixXd& du)
 {
-
 	Xdoto.setZero();
-
 
 	//Initialize states
 	Xo[0] = 85;
@@ -316,7 +314,6 @@ void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::Vect
 	Xo[7] = 0.0150;
 	Xo[8] = 0.0;
 
-
 	//Initialize inputs
 	Uo[0] = 0.0;
 	Uo[1] = -0.1780;
@@ -327,7 +324,25 @@ void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::Vect
 	dxdot.setConstant(0.00001);
 	dx.setConstant(0.00001);
 	du.setConstant(0.00001);
+}
 
+void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
+{
+	states[0] = 85;
+	states[1] = 0.0;
+	states[2] = 0.0;
+	states[3] = 0.0;
+	states[4] = 0.0;
+	states[5] = 0.0;
+	states[6] = 0.0;
+	states[7] = 0.1;
+	states[8] = 0.0;
+
+	controls[0] = 0.0;
+	controls[1] = -0.1;
+	controls[2] = 0.0;
+	controls[3] = 0.08;
+	controls[4] = 0.08;
 }
 
 Eigen::MatrixXd LinearizeSystem_A(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& DXDOT, Eigen::MatrixXd& DX, Eigen::MatrixXd& DU)
@@ -416,28 +431,9 @@ Eigen::MatrixXd LinearizeSystem_B(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eig
 Eigen::VectorXd LinearStateSpace(const Eigen::VectorXd& x, const Eigen::VectorXd& u, const Eigen::MatrixXd& A, const Eigen::MatrixXd& B)
 {
 	return A * x + B * u;
-
 }
 
-void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
-{
 
-	states[0] = 85;
-	states[1] = 0.0;
-	states[2] = 0.0;
-	states[3] = 0.0;
-	states[4] = 0.0;
-	states[5] = 0.0;
-	states[6] = 0.0;
-	states[7] = 0.1;
-	states[8] = 0.0;
-
-	controls[0] = 0.0;
-	controls[1] = -0.1;
-	controls[2] = 0.0;
-	controls[3] = 0.08;
-	controls[4] = 0.08;
-}
 
 int main()
 {
@@ -448,7 +444,6 @@ int main()
 	Eigen::VectorXd initialX(9); //Initial states for non linear simulation
 	Eigen::VectorXd initialU(5); //Initial controls for nonlinear simlulation. Controls will be dependent on aircraft/object - 1 engine, 2 engine, etc
 	initialStatesControls(initialX, initialU);
-
 	
 	CivilAircraft ac = CivilAircraft(initialX, initialU); 
 
@@ -614,13 +609,11 @@ int main()
 	double stepsLong = 150;
 	double increment = simTime / stepsLong;
 
-
 	//Eigen::VectorXd Xlong_o(4); //Phugoid.
 	//Xlong_o[0] = -1.99;
 	//Xlong_o[1] = 0.183;
 	//Xlong_o[2] = -0.0038;
 	//Xlong_o[3] = 0.0038;
-
 
 	//Eigen::VectorXd Xlong_o(4); //Short period
 	//Xlong_o[0] = 0.03;
@@ -628,22 +621,21 @@ int main()
 	//Xlong_o[2] = -1.0048;
 	//Xlong_o[3] = 0.0199;
 
-
 	Eigen::VectorXd Xlong_o(4); //Test Doublet
 	Xlong_o[0] = 0.0;
 	Xlong_o[1] = 0.0;
 	Xlong_o[2] = 0.0;
 	Xlong_o[3] = 0.0;
 
-
-
 	int number_of_controls = 5;
 	Eigen::MatrixXd Ulong_inputs(number_of_controls, int(stepsLong) + 1);
 	Ulong_inputs.setZero();
 
-	acl.initialize_deflections(0, Ulong_inputs,0, 0, 0, 0, stepsLong, increment); //initialize aileron
-	acl.initialize_deflections(1, Ulong_inputs,10, -20, 10, 10, stepsLong, increment); //initialize stabilizer
+	acl.initialize_deflections(0, Ulong_inputs,0,0,0,0,stepsLong, increment); //initialize aileron
+	acl.initialize_deflections(1, Ulong_inputs,10,-10,10,10,stepsLong, increment); //initialize stabilizer
 	acl.initialize_deflections(2, Ulong_inputs,0,0,0,0,stepsLong, increment); //initialize rudder
+	acl.initialize_thrusters(3, Ulong_inputs, 0.1, 40, stepsLong, increment); //thruster 1
+	acl.initialize_thrusters(4, Ulong_inputs, 0.1, 40, stepsLong, increment); //thruster 2
 
 
 

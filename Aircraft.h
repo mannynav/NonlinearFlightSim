@@ -162,6 +162,23 @@ public:
 		}
 	}
 
+	void initialize_thrusters(int U_index, Eigen::MatrixXd& U_inputs, double thrust_value, double phase_time, double steps, double increment)
+	{
+	
+		// Convert degrees to radians
+		double thrust = thrust_value;
+
+		// Apply the desired stabilizer profile (index 1 for stabilizer)
+		for (int i = 0; i <= steps; ++i) {
+			double current_time = i * increment;
+
+			if (current_time >= 0 && current_time < phase_time) {
+
+				U_inputs(U_index, i) = thrust;
+			}
+		}
+	}
+
 
 	Eigen::Vector3d engine_forces_body_frame(double g)
 	{
