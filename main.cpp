@@ -17,8 +17,6 @@ using Eigen::MatrixXd;
 Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen::VectorXd& U)
 {
 
-	//aircraft is not used yet.
-
 	double pi = std::numbers::pi;
 
 	double u = X[0]; //u
@@ -229,9 +227,6 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen:
 	Eigen::Vector3d gravity_body({ -g * sin(theta), g * cos(theta) * sin(phi), g * cos(theta) * cos(phi) });
 	Eigen::Vector3d gravity_forces_body = aircraft.mass * gravity_body;
 	
-	//std::cout << "Gravity body: " << std::endl;
-	//std::cout << gravity_body << std::endl;
-
 
 	//Inertia matrix - the aircrafts own state will take care of the inertia matrices
 	Eigen::Matrix3d inertiaMatrix(3, 3);
@@ -260,7 +255,7 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen:
 	Eigen::Vector3d cg_moments_body = MAcg_b + momentsFromEngineCG_body;
 
 	//Eigen::Vector3d x4tox6dot = invInertiaMatrix*(cg_moments_body - angular_vel_be_body_frame.cross(inertiaMatrix * angular_vel_be_body_frame));
-	Eigen::Vector3d x4tox6dot = aircraft.cg_moments_body_frame(rot_stab_to_body, angular_vel_be_body_frame, airSpeed, dynamicPressure, alpha, beta,g); //bug
+	Eigen::Vector3d x4tox6dot = aircraft.cg_moments_body_frame(rot_stab_to_body, angular_vel_be_body_frame, airSpeed, dynamicPressure, alpha, beta,g);
 	
 
 
@@ -274,7 +269,6 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen:
 
 	//Eigen::Vector3d x7tox9dot = H_pi * angular_vel_be_body_frame;
 	Eigen::Vector3d x7tox9dot = aircraft.euler_angles_euler_kinematics(angular_vel_be_body_frame, phi, theta, psi);
-
 
 
 
@@ -297,6 +291,25 @@ Eigen::VectorXd Implicit_Model(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::
 
 	
 	return Aircraft_Sim(ac, X, U) - XDOT;
+}
+
+void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
+{
+	states[0] = 85;
+	states[1] = 0.0;
+	states[2] = 0.0;
+	states[3] = 0.0;
+	states[4] = 0.0;
+	states[5] = 0.0;
+	states[6] = 0.0;
+	states[7] = 0.1;
+	states[8] = 0.0;
+
+	controls[0] = 0.0;
+	controls[1] = -0.1;
+	controls[2] = 0.0;
+	controls[3] = 0.08;
+	controls[4] = 0.08;
 }
 
 void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& dxdot, Eigen::MatrixXd& dx, Eigen::MatrixXd& du)
@@ -324,25 +337,6 @@ void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::Vect
 	dxdot.setConstant(0.00001);
 	dx.setConstant(0.00001);
 	du.setConstant(0.00001);
-}
-
-void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
-{
-	states[0] = 85;
-	states[1] = 0.0;
-	states[2] = 0.0;
-	states[3] = 0.0;
-	states[4] = 0.0;
-	states[5] = 0.0;
-	states[6] = 0.0;
-	states[7] = 0.1;
-	states[8] = 0.0;
-
-	controls[0] = 0.0;
-	controls[1] = -0.1;
-	controls[2] = 0.0;
-	controls[3] = 0.08;
-	controls[4] = 0.08;
 }
 
 Eigen::MatrixXd LinearizeSystem_A(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& DXDOT, Eigen::MatrixXd& DX, Eigen::MatrixXd& DU)
@@ -408,13 +402,10 @@ Eigen::MatrixXd LinearizeSystem_B(CivilAircraft& ac, Eigen::VectorXd& XDOTo, Eig
 
 			Eigen::VectorXd F = Implicit_Model(ac,XDOTo, Xo, u_plus);
 
-			std::cout << F << std::endl;
-
 			double F_plus_keep = F[i];
 
 			F = Implicit_Model(ac,XDOTo, Xo, u_minus);
-			
-			std::cout << F << std::endl;
+	
 			double F_minus_keep = F[i];
 			
 			B(i, j) = (F_plus_keep - F_minus_keep) / (2.0 * du);
@@ -479,7 +470,6 @@ int main()
 		nonLinearSolutionMatrix.col(i + 1) = nonLinearSolutionMatrix.col(i) + (timeIncrement / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
 
 	}
-	std::cout << nonLinearSolutionMatrix.leftCols(5) << std::endl;
 
 	/*for (int i = 0; i < steps; i++)
 	{
@@ -489,11 +479,6 @@ int main()
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	//// End of non linear simulation
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	//// Output results to csv fil
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	std::string fileName = "Non Linear Solution.csv";
@@ -538,17 +523,10 @@ int main()
 
 	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd Btest = LinearizeSystem_B(acl,Xdoto, Xo, Uo, dxdot, dx, du);
-	std::cout << Btest << std::endl;
 
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	//// Start of longitudinal model process
-	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	std::cout << "----------------------------------------- Start Longitudinal Model Process -------------------------------------------------" << std::endl;
 
-	std::cout << "----------------------------------------- Initialize S for similarity transformation, compute transformed A and B -------------------------------------------------" << std::endl;
 	Eigen::MatrixXd S(9, 9); //Matrix for similarity transformation of states
 	S.setZero();
 
@@ -566,7 +544,6 @@ int main()
 
 	Eigen::MatrixXd transformedA = T.inverse() * Atest * T;
 	Eigen::MatrixXd transformedB = T.inverse() * Btest;
-
 
 	std::cout << "transformed A: " << std::endl;
 	std::cout << transformedA << std::endl;
@@ -591,12 +568,7 @@ int main()
 	std::cout << Blongitudinal << std::endl;
 
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	//// Initialize states and controls for longitudinal model
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	std::cout << "--------------------- Initialize Xlong and Ulong for Longitudinal Model ------------------------------ " << std::endl;
-
+	//Initialize simulation variables for longitudinal variables.
 	double simTime = 150;
 	double stepsLong = 150;
 	double increment = simTime / stepsLong;
@@ -629,34 +601,50 @@ int main()
 	acl.initialize_thrusters(3, Ulong_inputs, 0.5, 60, stepsLong, increment); //thruster 1
 	acl.initialize_thrusters(4, Ulong_inputs, 0.5, 60, stepsLong, increment); //thruster 2
 
-
-	std::cout << "--------------------- State space simulation For Longitudinal Model ------------------------------ " << std::endl;
-
 	// Get the Dormand-Prince tableau
 	//RKTableauSS tableau_ss = dp45_tableau_ss();
 	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func = LinearStateSpace;
 
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	//// Start state space longitudinal model sim
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-
+	//Perform simulation.
 	Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, Ulong_inputs, 0, simTime, stepsLong, Alongitudinal, Blongitudinal);
 	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
 	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
 
-
-	std::cout << "----------------------------------------- End of simulation for Longitudinal Model -------------------------------------------------" << std::endl;
-	
 	fileName = "Linear Longitudinal Solution.csv";
+	std::string longitudinal_control_inputs = "Linear Longitudinal Control Inputs.csv";
+
 	outputToFile(solution_linear_long, fileName);
+	outputToFile(Ulong_inputs, longitudinal_control_inputs);
 
 
 
 
 	std::cout << "----------------------------------------- Start Lateral Model Process -------------------------------------------------" << std::endl;
-	Eigen::MatrixXd Alateral = transformedA.block(4,4, 4,4);
+	
+	//Initialize simulation variables.
+	double lateral_sim_time = 200;
+	double lateral_steps = 250;
+	double lateral_increment = simTime / lateral_steps;
 
+	//Initialize states
+	Eigen::VectorXd Xlateral_o(4);
+	Xlateral_o[0] = -1.99;
+	Xlateral_o[1] = 0.183;
+	Xlateral_o[2] = -0.0038;
+	Xlateral_o[3] = 0.0038;
+
+	Eigen::MatrixXd Ulat_inputs(number_of_controls, int(lateral_steps) + 1);
+	Ulat_inputs.setZero();
+
+	acl.initialize_deflections(0, Ulat_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize aileron
+	acl.initialize_deflections(1, Ulat_inputs, 10, -10, 10, 10, lateral_steps, increment); //initialize stabilizer
+	acl.initialize_deflections(2, Ulat_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize rudder
+	acl.initialize_thrusters(3, Ulat_inputs, 0.0, 60, lateral_steps, increment); //thruster 1
+	acl.initialize_thrusters(4, Ulat_inputs, 0.0, 60, lateral_steps, increment); //thruster 2
+	
+	//Extract A matrix for lateral system.
+	Eigen::MatrixXd Alateral = transformedA.block(4,4, 4,4);
 	std::cout << "Alateral: " << std::endl;
 	std::cout << Alateral << std::endl;
 	std::cout << "A lateral eigenvalues: " << std::endl;
@@ -666,45 +654,27 @@ int main()
 	std::cout << "Eigenvectors of A lateral: " << std::endl;
 	std::cout << eigenSolverLateral.eigenvectors() << std::endl;
 
+	//Extract B matrix for lateral system.
 	Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
 	std::cout << "Blateral: " << std::endl;
 	std::cout << Blateral << std::endl;
 
 
-	std::cout << "--------------------- Initialize Xlong and Ulong for Lateral Model ------------------------------ " << std::endl;
-
-	double lateral_sim_time = 200;
-	double lateral_steps = 250;
-	double lateral_increment = simTime / lateral_steps;
-
-	Eigen::VectorXd Xlateral_o(4); 
-	Xlateral_o[0] = -1.99;
-	Xlateral_o[1] = 0.183;
-	Xlateral_o[2] = -0.0038;
-	Xlateral_o[3] = 0.0038;
-
-	Eigen::MatrixXd ULateral_inputs(number_of_controls, int(lateral_steps) + 1);
-	ULateral_inputs.setZero();
-
-
-	std::cout << "--------------------- State space simulation For Lateral Model ------------------------------ " << std::endl;
-
-	// Get the Dormand-Prince tableau
+	//tableau for adaptive RK.
 	//RKTableauSS tableau_ss = dp45_tableau_ss();
 	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func_lateral = LinearStateSpace;
 
-	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, ULateral_inputs, 0, lateral_sim_time, lateral_steps, Alateral, Blateral);
-	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
-	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
-
+	//Perform simulation.
+	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, Ulat_inputs, 0, lateral_sim_time, lateral_steps, Alateral, Blateral);
+	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 1000, 500, 0.03, tableau_ss,Alateral, Blateral);
+	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 150, 300, Alateral, Blateral);
 
 	fileName = "Linear Lateral Solution.csv";
+	std::string lateral_control_inputs = "Linear Lateral Control Inputs.csv";
+
 	outputToFile(solution_linear_lateral, fileName);
-
-
-
-
-
+	outputToFile(Ulat_inputs, lateral_control_inputs);
+ 
 	return 0;
 
 }
