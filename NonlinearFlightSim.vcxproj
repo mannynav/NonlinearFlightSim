@@ -147,8 +147,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aircraft.h" />
+    <ClInclude Include="FlightModes.h" />
     <ClInclude Include="NumericalIntegration.h" />
     <ClInclude Include="Output.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="trim_controls.csv" />
+    <None Include="trim_states.csv" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
