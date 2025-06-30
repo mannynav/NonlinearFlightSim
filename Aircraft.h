@@ -1,6 +1,9 @@
 #pragma once
 
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues> // Include Eigen's Eigenvalues module for eigenvalue and eigenvector computation
 
+#include <map>
 
 
 /// This class will be used a base class for aircraft or objects that will be simulated. 
@@ -60,6 +63,15 @@ public:
 		y_aero_pos_Fm = 0;
 		z_aero_pos_Fm = 0;
 
+		//Engine applications points of thrust
+		eng1_x_pos_Fm = 0;
+		eng1_y_pos_Fm = -7.94;
+		eng1_z_pos_Fm = -1.9;
+
+		eng2_x_pos_Fm = 0.0;
+		eng2_y_pos_Fm = 7.94;
+		eng2_z_pos_Fm = -1.9;
+
 		InertiaMatrix << 40.07, 0, -2.0923,
 			0, 64, 0,
 			-2.0923, 0, 99.2;
@@ -71,15 +83,6 @@ public:
 		InverseInertiaMatrix = (1.0 / mass) * InverseInertiaMatrix;
 
 
-		//Engine applications points of thrust
-		eng1_x_pos_Fm = 0;
-		eng1_y_pos_Fm = -7.94;
-		eng1_z_pos_Fm = -1.9;
-
-		eng2_x_pos_Fm = 0.0;
-		eng2_y_pos_Fm = 7.94;
-		eng2_z_pos_Fm = -1.9;
-
 
 		//Aerodynamic force coefficients in stability axis
 		depsda = 0.25;
@@ -90,8 +93,6 @@ public:
 		a1 = -155.2;
 		a0 = -15.212;
 		alpha_switch = 14.5 * (pi / 180); //lift slope goes from linear to non-linear
-
-
 
 	}
 
@@ -238,7 +239,6 @@ public:
 		double downwash_angle = depsda * (alpha - alpha_initial);
 		//Calculate moments in body frame about center of gravity.
 		double eta11 = -1.4 * beta;
-		//std::cout << "ac alpha: " << downwash_angle << std::endl;
 		double eta21 = -0.59 - (3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord)) * (alpha - downwash_angle);
 		double eta31 = (1 - alpha * (180 / (15 * pi))) * beta;
 		Eigen::Vector3d eta({ eta11, eta21, eta31 });
@@ -321,6 +321,45 @@ public:
 
 	//Euler angles using quaternions - to be implemented
 	Eigen::Vector3d euler_angles_quaternion_kinematics() {}
+
+	std::map<std::string, double> getAircraftSpecs()
+	{
+		std::map<std::string, double> aircraft_specs;
+		aircraft_specs["mass"] = mass;
+		aircraft_specs["mean_aerodynamic_chord"] = mean_aerodynamic_chord;
+		aircraft_specs["lt"] = lt;
+		aircraft_specs["wing_planform_area"] = wing_planform_area;
+		aircraft_specs["tail_planform_area"] = tail_planform_area;
+
+		aircraft_specs["x_cg_pos_Fm"] = x_cg_pos_Fm;
+		aircraft_specs["y_cg_pos_Fm"] = y_cg_pos_Fm;
+		aircraft_specs["z_cg_pos_Fm"] = z_cg_pos_Fm;
+
+		aircraft_specs["x_aero_pos_Fm"] = x_aero_pos_Fm;
+		aircraft_specs["y_aero_pos_Fm"] = y_aero_pos_Fm;
+		aircraft_specs["z_aero_pos_Fm"] = z_aero_pos_Fm;
+
+		aircraft_specs["eng1_x_pos_Fm"] = eng1_x_pos_Fm;
+		aircraft_specs["eng1_y_pos_Fm"] = eng1_y_pos_Fm;
+		aircraft_specs["eng1_z_pos_Fm"] = eng1_z_pos_Fm;
+
+		aircraft_specs["eng2_x_pos_Fm"] = eng2_x_pos_Fm;
+		aircraft_specs["eng2_y_pos_Fm"] = eng2_y_pos_Fm;
+		aircraft_specs["eng2_z_pos_Fm"] = eng2_z_pos_Fm;
+	
+
+		return aircraft_specs;
+	}
+
+	std::map<std::string, Eigen::Matrix3d> getInertiaMatrices()
+	{
+		std::map<std::string, Eigen::Matrix3d> inertia_matrices;
+		inertia_matrices["inertia_matrix"] = InertiaMatrix;
+		inertia_matrices["inverse_inertia_matrix"] = InverseInertiaMatrix;
+
+		return inertia_matrices;
+
+	}
 
 	double pi{};
 
