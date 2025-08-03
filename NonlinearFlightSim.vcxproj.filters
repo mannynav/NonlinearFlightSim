@@ -32,12 +32,15 @@
     <ClInclude Include="FlightModes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GravityModel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="trim_controls.csv">
+    <None Include="trim_states.csv">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="trim_states.csv">
+    <None Include="trim_controls.csv">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

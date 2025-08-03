@@ -148,6 +148,7 @@
   <ItemGroup>
     <ClInclude Include="Aircraft.h" />
     <ClInclude Include="FlightModes.h" />
+    <ClInclude Include="GravityModel.h" />
     <ClInclude Include="NumericalIntegration.h" />
     <ClInclude Include="Output.h" />
   </ItemGroup>

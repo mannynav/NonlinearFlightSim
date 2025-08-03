@@ -40,6 +40,10 @@ public:
 		phi = states[6];
 		theta = states[7];
 		psi = states[8];
+		x_b = states[9];
+		y_b = states[10];
+		z_b = states[11];
+		
 
 		aileron_inp = controls[0];
 		stabilizer_inp = controls[1];
@@ -108,7 +112,12 @@ public:
 		phi = stateVector[6];
 		theta = stateVector[7];
 		psi = stateVector[8];
-		Eigen::VectorXd states(9);
+		x_b = stateVector[9];
+		y_b = stateVector[10];
+		z_b = stateVector[11];
+
+
+		Eigen::VectorXd states(12);
 		states[0] = u;
 		states[1] = v;
 		states[2] = w;
@@ -118,6 +127,11 @@ public:
 		states[6] = phi;
 		states[7] = theta;
 		states[8] = psi;
+		states[9] = x_b;
+		states[10] = y_b;
+		states[11] = z_b;
+
+
 		return states;
 	}
 
@@ -262,7 +276,6 @@ public:
 
 
 		Eigen::Vector3d CMac_b = eta + dCMdx * angular_vel_be_body_frame + dCMdu * uVec;
-		//std::cout << " ac eta" << eta[1]<< std::endl;
 
 
 		//Normalize to an aerodynamic moments
@@ -372,6 +385,9 @@ public:
 	double phi{}; //phi
 	double theta{}; //theta
 	double psi{}; //psi
+	double x_b{};
+	double y_b{};
+	double z_b{};
 
 
 	//controls
