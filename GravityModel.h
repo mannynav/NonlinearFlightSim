@@ -25,6 +25,10 @@ inline double us1976_gravity_model_simplified(double h) {
 	return g_0 * (1.0 - 2.0 * h / R_e);
 }
 
+inline double standard_gravity_model(double h) {
+	return 9.80665;
+}
+
 
 
 

@@ -149,8 +149,11 @@
     <ClInclude Include="Aircraft.h" />
     <ClInclude Include="FlightModes.h" />
     <ClInclude Include="GravityModel.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="NumericalIntegration.h" />
     <ClInclude Include="Output.h" />
+    <ClInclude Include="TrimVerification.h" />
+    <ClInclude Include="Utility.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="trim_controls.csv" />

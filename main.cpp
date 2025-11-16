@@ -16,6 +16,9 @@
 #include "map"
 #include <cmath>
 
+#include "Input.h"
+#include "Utility.h"
+
 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -204,7 +207,6 @@ Eigen::VectorXd Aircraft_Sim(CivilAircraft& aircraft, Eigen::VectorXd& X, Eigen:
 	return XDOT;
 
 }
-
 Eigen::VectorXd Implicit_Model(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::VectorXd& X, Eigen::VectorXd& U, const GravityModel& gravity_model) {
 
 	
@@ -212,6 +214,8 @@ Eigen::VectorXd Implicit_Model(CivilAircraft& ac, Eigen::VectorXd& XDOT, Eigen::
 }
 void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
 {
+
+	//These are trim parameters for straight and level flight at 10,000
 	states[0] = 84.9993;
 	states[1] = 0.0;
 	states[2] = 1.2713;
@@ -230,6 +234,7 @@ void initialStatesControls(Eigen::VectorXd& states, Eigen::VectorXd& controls)
 	controls[2] = 0.0;
 	controls[3] = 0.0821;
 	controls[4] = 0.0821;
+
 }
 void initializeTrimStatesInputsAndIncrements(Eigen::VectorXd& Xdoto, Eigen::VectorXd& Xo, Eigen::VectorXd& Uo, Eigen::MatrixXd& dxdot, Eigen::MatrixXd& dx, Eigen::MatrixXd& du)
 {
@@ -342,85 +347,85 @@ Eigen::VectorXd LinearStateSpace(const Eigen::VectorXd& x, const Eigen::VectorXd
 {
 	return A * x + B * u;
 }
-Eigen::VectorXd readVectorFromCsv(const std::string& filename) {
-	std::ifstream file(filename);
-	if (!file.is_open()) {
-		std::cerr << "Error: Could not open file " << filename << std::endl;
-		return Eigen::VectorXd(); // Return an empty vector
-	}
-
-	std::vector<double> data_vec;
-	std::string line;
-
-	while (std::getline(file, line)) {
-		std::stringstream ss(line);
-		std::string cell;
-
-		// Assuming a single column, read the entire line as one value
-		if (std::getline(ss, cell, ',')) { // Read until a comma (or end of line for single column)
-			try {
-				data_vec.push_back(std::stod(cell)); // Convert string to double
-			}
-			catch (const std::invalid_argument& e) {
-				std::cerr << "Warning: Invalid number in CSV file '" << filename << "': " << cell << " (" << e.what() << ")" << std::endl;
-				// You might choose to skip or handle this error differently
-			}
-			catch (const std::out_of_range& e) {
-				std::cerr << "Warning: Number out of range in CSV file '" << filename << "': " << cell << " (" << e.what() << ")" << std::endl;
-			}
-		}
-	}
-
-	// Convert std::vector<double> to Eigen::VectorXd
-	Eigen::VectorXd eigen_vector(data_vec.size());
-	for (size_t i = 0; i < data_vec.size(); ++i) {
-		eigen_vector(i) = data_vec[i];
-	}
-
-	return eigen_vector;
-}
-std::vector<double> readNumericCSVColumn(const std::string& filename, int columnIndex = 0)
-{
-	std::vector<double> data;
-	std::ifstream file(filename);
-
-	if (!file.is_open()) {
-		throw std::runtime_error("Could not open file: " + filename);
-	}
-
-	
-
-	std::string line;
-	//Skip the header
-	if (std::getline(file, line)) {}
-
-	while (std::getline(file, line)) {
-		std::stringstream lineStream(line);
-		std::string cell;
-		std::vector<std::string> rowData;
-
-		while (std::getline(lineStream, cell, ',')) {
-			rowData.push_back(cell);
-		}
-
-		if (columnIndex >= rowData.size()) {
-			throw std::runtime_error("Column index out of range in row: " + line);
-		}
-
-		try {
-			double value = std::stod(rowData[columnIndex]);
-			data.push_back(value);
-		}
-		catch (const std::invalid_argument& e) {
-			throw std::runtime_error("Invalid numeric value in row: " + line + ", column: " + std::to_string(columnIndex));
-		}
-		catch (const std::out_of_range& e) {
-			throw std::runtime_error("Numeric value out of range in row: " + line + ", column: " + std::to_string(columnIndex));
-		}
-	}
-
-	return data;
-}
+//Eigen::VectorXd readVectorFromCsv(const std::string& filename) {
+//	std::ifstream file(filename);
+//	if (!file.is_open()) {
+//		std::cerr << "Error: Could not open file " << filename << std::endl;
+//		return Eigen::VectorXd(); // Return an empty vector
+//	}
+//
+//	std::vector<double> data_vec;
+//	std::string line;
+//
+//	while (std::getline(file, line)) {
+//		std::stringstream ss(line);
+//		std::string cell;
+//
+//		// Assuming a single column, read the entire line as one value
+//		if (std::getline(ss, cell, ',')) { // Read until a comma (or end of line for single column)
+//			try {
+//				data_vec.push_back(std::stod(cell)); // Convert string to double
+//			}
+//			catch (const std::invalid_argument& e) {
+//				std::cerr << "Warning: Invalid number in CSV file '" << filename << "': " << cell << " (" << e.what() << ")" << std::endl;
+//				// You might choose to skip or handle this error differently
+//			}
+//			catch (const std::out_of_range& e) {
+//				std::cerr << "Warning: Number out of range in CSV file '" << filename << "': " << cell << " (" << e.what() << ")" << std::endl;
+//			}
+//		}
+//	}
+//
+//	// Convert std::vector<double> to Eigen::VectorXd
+//	Eigen::VectorXd eigen_vector(data_vec.size());
+//	for (size_t i = 0; i < data_vec.size(); ++i) {
+//		eigen_vector(i) = data_vec[i];
+//	}
+//
+//	return eigen_vector;
+//}
+//std::vector<double> readNumericCSVColumn(const std::string& filename, int columnIndex = 0)
+//{
+//	std::vector<double> data;
+//	std::ifstream file(filename);
+//
+//	if (!file.is_open()) {
+//		throw std::runtime_error("Could not open file: " + filename);
+//	}
+//
+//	
+//
+//	std::string line;
+//	//Skip the header
+//	if (std::getline(file, line)) {}
+//
+//	while (std::getline(file, line)) {
+//		std::stringstream lineStream(line);
+//		std::string cell;
+//		std::vector<std::string> rowData;
+//
+//		while (std::getline(lineStream, cell, ',')) {
+//			rowData.push_back(cell);
+//		}
+//
+//		if (columnIndex >= rowData.size()) {
+//			throw std::runtime_error("Column index out of range in row: " + line);
+//		}
+//
+//		try {
+//			double value = std::stod(rowData[columnIndex]);
+//			data.push_back(value);
+//		}
+//		catch (const std::invalid_argument& e) {
+//			throw std::runtime_error("Invalid numeric value in row: " + line + ", column: " + std::to_string(columnIndex));
+//		}
+//		catch (const std::out_of_range& e) {
+//			throw std::runtime_error("Numeric value out of range in row: " + line + ", column: " + std::to_string(columnIndex));
+//		}
+//	}
+//
+//	return data;
+//}
 
 
 void verifyStraightLevelTrimConditions(CivilAircraft& ac, Eigen::VectorXd& states, Eigen::VectorXd& controls, const GravityModel& gravity_model) {
@@ -535,50 +540,46 @@ int main()
 	//// Initialization of non linear simulation
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	Eigen::VectorXd initialX(12); //Initial states for non linear simulation
-	Eigen::VectorXd initialU(5); //Initial controls for nonlinear simlulation. Controls will be dependent on aircraft/object - 1 engine, 2 engine, etc
+	 //Initial states for simulation.
+	Eigen::VectorXd initialX(12);
+
+	//Initial controls for simlulation. Controls will be dependent on aircraft/object - 1 engine, 2 engine, etc
+	Eigen::VectorXd initialU(5);
+
+	//Currently set to simulate straight and level flight at 10000m.
 	initialStatesControls(initialX, initialU);
 	
+	//select aircraft. Will add NASA check cases.
 	CivilAircraft ac = CivilAircraft(initialX, initialU); 
-	//std::map<std::string, double> aircraft_map = ac.getAircraftSpecs(); //make as parameter to simulation 
 
 
-	 // Select gravity model
-	GravityModel gravity_model = isa_gravity_model;
-	std::string gravity_model_name = "1976";
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Initialization
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	std::string gravity_model_choice = "1976";
-	if (gravity_model_choice == "ISA") {
-		gravity_model = isa_gravity_model;
-		gravity_model_name = "ISA";
-	}
-	else if (gravity_model_choice == "1976") {
-		gravity_model = us1976_gravity_model_simplified;
-		gravity_model_name = "1976";
-	}
-	else {
-		std::cerr << "Unknown gravity model: " << gravity_model_choice << ". Using ISA." << std::endl;
-	}
-	std::cout << "Using gravity model: " << gravity_model_name << std::endl;
+	//select gravity model
+	//GravityModel gravity_model = isa_gravity_model;
+	//GravityModel gravity_model = us1976_gravity_model_simplified;
+	GravityModel gravity_model = standard_gravity_model; //9.08665.
 
-
+	//parameters for simulation
 	double simLength = 150;
 	double steps = 200;
 	double timeIncrement = simLength / steps;
-
 	int rows = initialX.size();
 	int time_steps = steps + 1;
 
+	//Vector of points at which solution is approximated
+	std::vector<double> time_step_vector = generate_arange(0.0, steps+timeIncrement, timeIncrement);
+
+	//Matrix to hold solution points
 	Eigen::MatrixXd nonLinearSolutionMatrix(rows, time_steps);
 	nonLinearSolutionMatrix.setZero().col(0) = initialX;
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	//// Start non linear simulation
+	//// Start simulation
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	
 
 	for (int i = 0; i < steps; i++)
 	{
@@ -597,29 +598,216 @@ int main()
 		nonLinearSolutionMatrix.col(i + 1) = nonLinearSolutionMatrix.col(i) + (timeIncrement / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
 	}
 
+	std::cout << "----------------------------------------- End of simulation -------------------------------------------------" << std::endl;
 
+
+	std::string fileName = "Non Linear Solution.csv";
+	outputToFileWithHeaders(nonLinearSolutionMatrix, fileName);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	//// End of non linear simulation
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	std::string fileName = "Non Linear Solution.csv";
-	outputToFileWithHeaders(nonLinearSolutionMatrix, fileName);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Initialize data structures for post processing
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	//Preallocate vectors to store variables
+	Eigen::VectorXd Altitude(time_steps);
+	//Eigen::VectorXd InterpSpeedOfSound(time_steps);
+	//Eigen::VectorXd AirDensity(time_steps);
+	//Eigen::VectorXd TranslationalVelocity(time_steps);
+	//Eigen::VectorXd Mach(time_steps);
+
+	Eigen::VectorXd AngleOfAttack(time_steps); //radians
+	//Eigen::VectorXd AngleOfSideslip(time_steps); //radians
 
 
-	std::cout << "----------------------------------------- End of non linear simulation -------------------------------------------------" << std::endl;
+	//Cosine and sine values for Euler angles from main simulation
+	Eigen::VectorXd c_phi(time_steps);
+	Eigen::VectorXd c_theta(time_steps);
+	Eigen::VectorXd c_psi(time_steps);
+	Eigen::VectorXd s_phi(time_steps);
+	Eigen::VectorXd s_theta(time_steps);
+	Eigen::VectorXd s_psi(time_steps);
 
+
+	//Coordinate transformation vectors for body to NED frame - easier than having update a rotation matrix
+	Eigen::VectorXd body2NED_11(time_steps);
+	Eigen::VectorXd body2NED_12(time_steps);
+	Eigen::VectorXd body2NED_13(time_steps);
+	Eigen::VectorXd body2NED_21(time_steps);
+	Eigen::VectorXd body2NED_22(time_steps);
+	Eigen::VectorXd body2NED_23(time_steps);
+	Eigen::VectorXd body2NED_31(time_steps);
+	Eigen::VectorXd body2NED_32(time_steps);
+	Eigen::VectorXd body2NED_33(time_steps);
+
+
+	//u,v,w transformed to NED frame from body frame
+	Eigen::VectorXd u_NED(time_steps);
+	Eigen::VectorXd v_NED(time_steps);
+	Eigen::VectorXd w_NED(time_steps);
+
+	//phi, theta, psi in radians
+	Eigen::VectorXd phi_rad(time_steps);
+	Eigen::VectorXd theta_rad(time_steps);
+	Eigen::VectorXd psi_rad(time_steps);
+
+	//phi, theta, psi in degrees
+	Eigen::VectorXd phi_deg(time_steps);
+	Eigen::VectorXd theta_deg(time_steps);
+	Eigen::VectorXd psi_deg(time_steps);
+
+	//angular rates
+	Eigen::VectorXd roll_rate(time_steps);
+	Eigen::VectorXd pitch_rate(time_steps);
+	Eigen::VectorXd yaw_rate(time_steps);
+
+	for (int i = 0; i < time_steps; ++i)
+	{
+
+		Altitude[i] = -nonLinearSolutionMatrix(11, i);
+
+		c_phi[i] = cos(nonLinearSolutionMatrix(6, i));
+		c_theta[i] = cos(nonLinearSolutionMatrix(7, i));
+		c_psi[i] = cos(nonLinearSolutionMatrix(8, i));
+
+		s_phi[i] = sin(nonLinearSolutionMatrix(6, i));
+		s_theta[i] = sin(nonLinearSolutionMatrix(7, i));
+		s_psi[i] = sin(nonLinearSolutionMatrix(8, i));
+
+		//these are coefficients are the rotation matrix from the BF to NED, 11 = row 1, col 1 -- 12 = row 1, col 2, etc.
+		body2NED_11[i] = c_theta[i] * c_psi[i];
+		body2NED_12[i] = -c_phi[i] * s_psi[i] + s_phi[i] * s_theta[i] * c_psi[i];
+		body2NED_13[i] = s_phi[i] * s_psi[i] + c_phi[i] * s_theta[i] * c_psi[i];
+		body2NED_21[i] = c_theta[i] * s_psi[i];
+		body2NED_22[i] = c_phi[i] * c_psi[i] + s_phi[i] * s_theta[i] * s_psi[i];
+		body2NED_23[i] = -s_phi[i] * c_psi[i] + c_phi[i] * s_theta[i] * s_psi[i];
+		body2NED_31[i] = -s_theta[i];
+		body2NED_32[i] = s_phi[i] * c_theta[i];
+		body2NED_33[i] = c_phi[i] * c_theta[i];
+
+
+		u_NED[i] = body2NED_11[i] * nonLinearSolutionMatrix(0, i) + body2NED_12[i] * nonLinearSolutionMatrix(1, i) + body2NED_13[i] * nonLinearSolutionMatrix(2, i);
+		v_NED[i] = body2NED_21[i] * nonLinearSolutionMatrix(0, i) + body2NED_22[i] * nonLinearSolutionMatrix(1, i) + body2NED_23[i] * nonLinearSolutionMatrix(2, i);
+		w_NED[i] = body2NED_31[i] * nonLinearSolutionMatrix(0, i) + body2NED_32[i] * nonLinearSolutionMatrix(1, i) + body2NED_33[i] * nonLinearSolutionMatrix(2, i);
+
+
+		phi_rad[i] = atan2(body2NED_32[i], body2NED_33[i]);
+		theta_rad[i] = -asin(body2NED_31[i]);
+		psi_rad[i] = atan2(body2NED_21[i], body2NED_11[i]);
+
+		phi_deg[i] = (180 / 3.14) * phi_rad[i];
+		theta_deg[i] = (180 / 3.14) * theta_rad[i];
+		psi_deg[i] = (180 / 3.14) * psi_rad[i];
+
+		roll_rate[i] = nonLinearSolutionMatrix(3, i);
+		pitch_rate[i] = nonLinearSolutionMatrix(4, i);
+		yaw_rate[i] = nonLinearSolutionMatrix(5, i);
+
+	}
+
+
+	//Angle of attack
+	for (int i = 0; i < time_steps; i++)
+	{
+		double temp; //avoid division by zero
+
+		if (nonLinearSolutionMatrix(0, i) == 0) {
+			temp = 0.0;
+		}
+		else {
+			temp = nonLinearSolutionMatrix(2, i) / nonLinearSolutionMatrix(0, i);
+		}
+		AngleOfAttack[i] = atan(temp);
+	}
+
+
+	//Vector for plotting purposes
+	Eigen::VectorXd time_vector(time_steps);
+	for (int i = 0; i < time_steps; i++) {
+		time_vector[i] = time_step_vector[i];
+	}
+
+
+	Eigen::MatrixXd postProcessMatrix(29, time_steps);
+	postProcessMatrix.row(0) = time_vector;
+	postProcessMatrix.row(1) = Altitude.transpose(); //m
+	postProcessMatrix.row(2) = 3.28 * Altitude.transpose(); // ft - mean sea level
+
+	//postProcessMatrix.row(3) = 3.28 * InterpSpeedOfSound.transpose(); // ft/sec
+	//postProcessMatrix.row(4) = 0.001941811 * AirDensity.transpose(); // slug/ft3
+	//postProcessMatrix.row(5) = 1.94384 * TranslationalVelocity.transpose(); // nmi_h
+	//postProcessMatrix.row(6) = Mach.transpose();
+
+	postProcessMatrix.row(7) = AngleOfAttack.transpose(); // radians
+	postProcessMatrix.row(8) = (180 / 3.14) * AngleOfAttack.transpose(); // degrees
+
+	//postProcessMatrix.row(9) = AngleOfSideslip.transpose(); // radians
+	//postProcessMatrix.row(10) = (180 / 3.14) * AngleOfSideslip.transpose(); // degrees
+
+	postProcessMatrix.row(11) = u_NED.transpose(); // m/sec
+	postProcessMatrix.row(12) = v_NED.transpose(); // m/sec
+	postProcessMatrix.row(13) = w_NED.transpose(); // m/sec
+	postProcessMatrix.row(14) = 3.28 * u_NED.transpose(); // ft/sec
+	postProcessMatrix.row(15) = 3.28 * v_NED.transpose(); // ft/sec
+	postProcessMatrix.row(16) = 3.28 * w_NED.transpose(); // ft/sec
+
+	postProcessMatrix.row(17) = phi_rad.transpose(); // rad
+	postProcessMatrix.row(18) = theta_rad.transpose();
+	postProcessMatrix.row(19) = psi_rad.transpose();
+	postProcessMatrix.row(20) = phi_deg.transpose(); // deg
+	postProcessMatrix.row(21) = theta_deg.transpose();
+	postProcessMatrix.row(22) = psi_deg.transpose();
+
+	postProcessMatrix.row(23) = roll_rate.transpose(); // rad/sec
+	postProcessMatrix.row(24) = pitch_rate.transpose();
+	postProcessMatrix.row(25) = yaw_rate.transpose();
+
+	postProcessMatrix.row(26) = (180 / 3.14) * roll_rate.transpose(); // deg/sec
+	postProcessMatrix.row(27) = (180 / 3.14) * pitch_rate.transpose();
+	postProcessMatrix.row(28) = (180 / 3.14) * yaw_rate.transpose();
+
+
+
+	std::ofstream outputPostProcessFile("postProcessSolution.csv");
+	if (outputPostProcessFile.is_open()) {
+		outputPostProcessFile << std::fixed << std::setprecision(10); // Set precision for output
+
+		// Write header row (optional, but helpful)
+		outputPostProcessFile << "Time, Altitude - m, Altitude - ft, SpeedofSound - ft/sec, AirDensity - slug/ft3,TransVel - ft/sec,Mach, AoA - rad, AoA - deg, AoS - rad, AoS - deg, u_NED, v_NED, w_NED, u_NED - ft/sec, v_NED - ft/sec, w_NED - ft/sec, phi_rad, theta_rad, psi_rad, phi_deg, theta_deg, psi_deg, roll_rate - rad/s, pitch_rate - rad/s, yaw_rate - rad/s, roll_rate - deg/s, pitch_rate - deg/s, yaw_rate - deg/s \n";
+
+		// Write each row of the solution matrix to the CSV file
+		for (int i = 0; i < postProcessMatrix.cols(); ++i) {
+			for (int j = 0; j < postProcessMatrix.rows(); ++j) {
+				outputPostProcessFile << postProcessMatrix(j, i);
+				if (j < postProcessMatrix.rows() - 1) {
+					outputPostProcessFile << ","; // Add comma as separator
+				}
+			}
+			outputPostProcessFile << "\n"; // Add newline after each row
+		}
+		outputPostProcessFile.close();
+		std::cout << "Post process matrix written to postProcessSolution.csv" << std::endl;
+	}
+	else {
+		std::cerr << "Unable to open file for writing: postProcessSolution.csv" << std::endl;
+		return 1;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// End of post processing
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
 	std::cout << "----------------------------------------- Initializing trim point for Xo and Uo (Get from Matlab) -------------------------------------------------" << std::endl;
 
-	//Read in state and control values from trim routine
-	std::string states_file = "trim_states.csv";
-	std::string controls_file = "trim_controls.csv";
-
-	Eigen::VectorXd states = readVectorFromCsv(states_file);
-	Eigen::VectorXd controls = readVectorFromCsv(controls_file);
+	//Read in trim points
+	Eigen::VectorXd states = readVectorFromCsv("trim_states.csv");
+	Eigen::VectorXd controls = readVectorFromCsv("trim_controls.csv");
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -632,194 +820,299 @@ int main()
 	
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
-	////// Initialize structures and matrices for linearization about straight and level trim
+	////// Initialize data structures and matrices for linearization about trim point
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	////Vectors for states and inputs
-	//Eigen::VectorXd Xdoto(12);
-	//Eigen::VectorXd Xo(12);
-	//Eigen::VectorXd Uo(5);
+	//Vectors for states and inputs
+	Eigen::VectorXd Xdoto(12);
+	Eigen::VectorXd Xo(12);
+	Eigen::VectorXd Uo(5);
 
-	////Matrices for increments for the finite difference step
-	//Eigen::MatrixXd dxdot(12, 12);
-	//Eigen::MatrixXd dx(12, 12);
-	//Eigen::MatrixXd du(12, 5);
+	//Matrices for increments for the finite difference step
+	Eigen::MatrixXd dxdot(12, 12);
+	Eigen::MatrixXd dx(12, 12);
+	Eigen::MatrixXd du(12, 5);
 
-	//initializeTrimStatesInputsAndIncrements(Xdoto, Xo, Uo, dxdot, dx, du);
+	initializeTrimStatesInputsAndIncrements(Xdoto, Xo, Uo, dxdot, dx, du);
 
-	//CivilAircraft acl = CivilAircraft(Xo, Uo);
+	CivilAircraft acl = CivilAircraft(Xo, Uo);
 
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	////// Linearize system to obtain A and B
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
-	//Eigen::MatrixXd Atest = LinearizeSystem_A(acl,Xdoto, Xo, Uo, dxdot, dx, du);
-	//std::cout << "Eigenvalues of A: " << std::endl;
-	//std::cout << Atest.eigenvalues() << std::endl;
+	std::cout << "----------------------------------------- Linearize system for A -------------------------------------------------" << std::endl;
+	Eigen::MatrixXd Atest = LinearizeSystem_A(acl,Xdoto, Xo, Uo, dxdot, dx, du,gravity_model);
+	std::cout << "Eigenvalues of A: " << std::endl;
+	std::cout << Atest.eigenvalues() << std::endl;
 
 
-	//std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
-	//Eigen::MatrixXd Btest = LinearizeSystem_B(acl,Xdoto, Xo, Uo, dxdot, dx, du);
+	std::cout << "----------------------------------------- Linearize system for B -------------------------------------------------" << std::endl;
+	Eigen::MatrixXd Btest = LinearizeSystem_B(acl,Xdoto, Xo, Uo, dxdot, dx, du,gravity_model);
 
 
-	//std::cout << "----------------------------------------- Start Longitudinal Model Process -------------------------------------------------" << std::endl;
+	std::cout << "----------------------------------------- Start Longitudinal Model Process -------------------------------------------------" << std::endl;
 
-	//Eigen::MatrixXd S(12, 12); //Matrix for similarity transformation of states
-	//S.setZero();
+	Eigen::MatrixXd S(12, 12); //Matrix for similarity transformation of states
+	S.setZero();
 
-	///*S << 1, 0, 0, 0, 0, 0, 0, 0, 0,
-	//	0, 0, 1, 0, 0, 0, 0, 0, 0,
-	//	0, 0, 0, 0, 1, 0, 0, 0, 0,
-	//	0, 0, 0, 0, 0, 0, 0, 1, 0,
-	//	0, 1, 0, 0, 0, 0, 0, 0, 0,
-	//	0, 0, 0, 1, 0, 0, 0, 0, 0,
-	//	0, 0, 0, 0, 0, 1, 0, 0, 0,
-	//	0, 0, 0, 0, 0, 0, 1, 0, 0,
-	//	0, 0, 0, 0, 0, 0, 0, 0, 1;*/
+	S << 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // u
+		0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // w
+		0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,  // q
+		0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,  // theta
+		0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // v
+		0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,  // p
+		0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,  // r
+		0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,  // phi
+		0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,  // psi
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,  // x_e
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,  // y_e
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;  // z_e
 
-	//S << 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // u
-	//	0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // w
-	//	0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,  // q
-	//	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,  // theta
-	//	0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // v
-	//	0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,  // p
-	//	0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,  // r
-	//	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,  // phi
-	//	0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,  // psi
-	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,  // x_e
-	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,  // y_e
-	//	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;  // z_e
+	Eigen::MatrixXd T = S.inverse();
 
-	//Eigen::MatrixXd T = S.inverse();
+	Eigen::MatrixXd transformedA = T.inverse() * Atest * T;
+	Eigen::MatrixXd transformedB = T.inverse() * Btest;
 
-	//Eigen::MatrixXd transformedA = T.inverse() * Atest * T;
-	//Eigen::MatrixXd transformedB = T.inverse() * Btest;
+	std::cout << "transformed A: " << std::endl;
+	std::cout << transformedA << std::endl;
 
-	//std::cout << "transformed A: " << std::endl;
-	//std::cout << transformedA << std::endl;
+	std::cout << "transformed B: " << std::endl;
+	std::cout << transformedB << std::endl;
 
-	//std::cout << "transformed B: " << std::endl;
-	//std::cout << transformedB << std::endl;
+	Eigen::MatrixXd Alongitudinal = transformedA.block(0, 0, 4, 4);
+	Eigen::MatrixXd Blongitudinal = transformedB.block(0, 0, 4, 5);
 
-	//Eigen::MatrixXd Alongitudinal = transformedA.block(0, 0, 4, 4);
-	//Eigen::MatrixXd Blongitudinal = transformedB.block(0, 0, 4, 5);
+	std::cout << "A long: " << std::endl;
+	std::cout << Alongitudinal << std::endl;
 
-	//std::cout << "A long: " << std::endl;
-	//std::cout << Alongitudinal << std::endl;
+	std::cout << "Eigenvalues of A long: " << std::endl;
+	std::cout << Alongitudinal.eigenvalues() << std::endl;
 
-	//std::cout << "Eigenvalues of A long: " << std::endl;
-	//std::cout << Alongitudinal.eigenvalues() << std::endl;
+	std::cout << "B long: " << std::endl;
+	std::cout << Blongitudinal << std::endl;
 
-	//Eigen::EigenSolver<Eigen::MatrixXd> eigenSolver(Alongitudinal); // Use EigenSolver to compute eigenvalues and eigenvectors
-	//std::cout << "Eigenvectors of A long: " << std::endl;
-	//std::cout << eigenSolver.eigenvectors() << std::endl;
+	//Extract A matrix for lateral system.
+	Eigen::MatrixXd Alateral = transformedA.block(4,4, 4,4);
+	std::cout << "Alateral: " << std::endl;
+	std::cout << Alateral << std::endl;
+	std::cout << "A lateral eigenvalues: " << std::endl;
+	std::cout << Alateral.eigenvalues() << std::endl;
 
-	//std::cout << "B long: " << std::endl;
-	//std::cout << Blongitudinal << std::endl;
+	//Extract B matrix for lateral system.
+	Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
+	std::cout << "Blateral: " << std::endl;
+	std::cout << Blateral << std::endl;
 
 
-	////Initialize simulation variables for longitudinal variables.
-	//double simTime = 150;
-	//double stepsLong = 150;
-	//double increment = simTime / stepsLong;
 
-	////Eigen::VectorXd Xlong_o(4); //Phugoid.
-	////Xlong_o = phugoid();
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Eigenvalue Analysis of longitudinal and lateral modes
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	////Eigen::VectorXd Xlong_o(4); //Short period
-	////Xlong_o = short_period();
+	std::cout << "----------------------------------------- Eigenvalue Analysis ----------------------------------------- " << std::endl;
+	Eigen::EigenSolver<Eigen::MatrixXd> solver_full(transformedA);
+	Eigen::VectorXcd eigenvalues_full = solver_full.eigenvalues();
+	std::cout << "Eigenvalues of A (full system):\n" << eigenvalues_full << "\n";
 
-	//Eigen::VectorXd Xlong_o(4); //Test Doublet
-	//Xlong_o[0] = 0.0;
-	//Xlong_o[1] = 0.0;
-	//Xlong_o[2] = 0.0;
-	//Xlong_o[3] = 0.0;
+	// Eigenvalues and vectors for longitudinal modes
+	Eigen::EigenSolver<Eigen::MatrixXd> solver_long(Alongitudinal);
+	Eigen::VectorXcd eigenvalues_long = solver_long.eigenvalues();
+	Eigen::MatrixXcd eigenvectors_long = solver_long.eigenvectors();
+	std::cout << "Eigenvalues of A_longitudinal:\n" << eigenvalues_long << "\n";
+	std::cout << "Eigenvectors of A_longitudinal:\n" << eigenvectors_long << "\n";
 
-	//int number_of_controls = 5;
-	//Eigen::MatrixXd longitudinal_control_inputs(number_of_controls, int(stepsLong) + 1);
-	//longitudinal_control_inputs.setZero();
+	// Eigenvalues and vectors for longitudinal modes
+	Eigen::EigenSolver<Eigen::MatrixXd> solver_lat(Alateral);
+	Eigen::VectorXcd eigenvalues_lat = solver_lat.eigenvalues();
+	Eigen::MatrixXcd eigenvectors_lat = solver_lat.eigenvectors();
+	std::cout << "Eigenvalues of A_lateral:\n" << eigenvalues_lat << "\n";
+	std::cout << "Eigenvectors of A_lateral: \n" << eigenvectors_lat << "\n";
 
-	//acl.initialize_deflections(0, longitudinal_control_inputs,0,0,0,0,stepsLong, increment); //initialize aileron
-	//acl.initialize_deflections(1, longitudinal_control_inputs,10,-10,10,10,stepsLong, increment); //initialize stabilizer
-	//acl.initialize_deflections(2, longitudinal_control_inputs,0,0,0,0,stepsLong, increment); //initialize rudder
-	//acl.initialize_thrusters(3, longitudinal_control_inputs, 0.5, 60, stepsLong, increment); //thruster 1
-	//acl.initialize_thrusters(4, longitudinal_control_inputs, 0.5, 60, stepsLong, increment); //thruster 2
+	// Identify longitudinal modes
+	int short_period_idx = -1, phugoid_idx = -1;
+	double max_wn = 0.0, min_wn = 1e10;
+	for (int i = 0; i < eigenvalues_long.size(); ++i) {
+		double re = eigenvalues_long(i).real();
+		double im = eigenvalues_long(i).imag();
+		if (abs(im) > 1e-6) { // Oscillatory mode
+			double wn = sqrt(re * re + im * im);
+			if (wn > max_wn) {
+				max_wn = wn;
+				short_period_idx = i; // Highest wn is short-period
+			}
+			if (wn < min_wn) {
+				min_wn = wn;
+				phugoid_idx = i; // Lowest wn is phugoid
+			}
+		}
+	}
+
+	// Identify lateral modes
+	int dutch_roll_idx = -1, roll_subsidence_idx = -1, spiral_idx = -1;
+	max_wn = 0.0;
+	for (int i = 0; i < eigenvalues_lat.size(); ++i) {
+		double re = eigenvalues_lat(i).real();
+		double im = eigenvalues_lat(i).imag();
+		if (abs(im) > 1e-6) { // Oscillatory (Dutch roll)
+			dutch_roll_idx = i;
+			max_wn = sqrt(re * re + im * im);
+		}
+		else if (re < -1.0) { // Fast stable mode (roll subsidence)
+			roll_subsidence_idx = i;
+		}
+		else { // Slow mode (spiral)
+			spiral_idx = i;
+		}
+	}
+
+
+	// Analyze modes
+	std::cout << "Mode Analysis:\n";
+	for (int i = 0; i < eigenvalues_full.size(); ++i) {
+		double re = eigenvalues_full(i).real();
+		double im = eigenvalues_full(i).imag();
+		if (abs(im) > 1e-6) {
+			double wn = sqrt(re * re + im * im);
+			double zeta = -re / wn;
+			std::cout << "Full Mode " << i + 1 << ": Oscillatory, wn = " << wn << " rad/s, zeta = " << zeta << "\n";
+		}
+		else {
+			if (abs(re) < 1e-6) {
+				std::cout << "Full Mode " << i + 1 << ": Neutrally stable\n";
+			}
+			else if (re < 0) {
+				std::cout << "Full Mode " << i + 1 << ": Stable, time constant = " << -1.0 / re << " s\n";
+			}
+			else {
+				std::cout << "Full Mode " << i + 1 << ": Unstable, time constant = " << -1.0 / re << " s\n";
+			}
+		}
+	}
+
+	// Longitudinal modes
+	std::cout << "Longitudinal Modes:\n";
+	for (int i = 0; i < eigenvalues_long.size(); ++i) {
+		double re = eigenvalues_long(i).real();
+		double im = eigenvalues_long(i).imag();
+		if (abs(im) > 1e-6) {
+			double wn = sqrt(re * re + im * im);
+			double zeta = -re / wn;
+			std::cout << "Mode " << i + 1 << " (Short-period/Phugoid): wn = " << wn << " rad/s, zeta = " << zeta << "\n";
+		}
+		else {
+			std::cout << "Mode " << i + 1 << ": Non-oscillatory, time constant = " << (abs(re) < 1e-6 ? "inf" : std::to_string(-1.0 / re)) << " s\n";
+		}
+	}
+
+	// Lateral modes
+	std::cout << "Lateral Modes:\n";
+	for (int i = 0; i < eigenvalues_lat.size(); ++i) {
+		double re = eigenvalues_lat(i).real();
+		double im = eigenvalues_lat(i).imag();
+		if (abs(im) > 1e-6) {
+			double wn = sqrt(re * re + im * im);
+			double zeta = -re / wn;
+			std::cout << "Mode " << i + 1 << " (Dutch roll): wn = " << wn << " rad/s, zeta = " << zeta << "\n";
+		}
+		else {
+			if (abs(re) < 1e-6) {
+				std::cout << "Mode " << i + 1 << " (Roll/Spiral): Neutrally stable\n";
+			}
+			else if (re < 0) {
+				std::cout << "Mode " << i + 1 << " (Roll/Spiral): Stable, time constant = " << -1.0 / re << " s\n";
+			}
+			else {
+				std::cout << "Mode " << i + 1 << " (Spiral): Unstable, time constant = " << -1.0 / re << " s\n";
+			}
+		}
+	}
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Longitudinal Simulation
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	//Initialize simulation variables for longitudinal variables.
+	double simTime = 150;
+	double stepsLong = 150;
+	double increment = simTime / stepsLong;
+
+	//Eigen::VectorXd Xlong_o(4); //Phugoid.
+	//Xlong_o = phugoid();
+
+	Eigen::VectorXd Xlong_o(4); //Short period
+	Xlong_o = short_period_2();
+
+	int number_of_controls = 5;
+	Eigen::MatrixXd longitudinal_control_inputs(number_of_controls, int(stepsLong) + 1);
+	longitudinal_control_inputs.setZero();
+
+	acl.initialize_deflections(0, longitudinal_control_inputs,0,0,0,0,stepsLong, increment); //initialize aileron
+	acl.initialize_deflections(1, longitudinal_control_inputs,10,-10,10,10,stepsLong, increment); //initialize stabilizer
+	acl.initialize_deflections(2, longitudinal_control_inputs,0,0,0,0,stepsLong, increment); //initialize rudder
+	acl.initialize_thrusters(3, longitudinal_control_inputs, 0.5, 60, stepsLong, increment); //thruster 1
+	acl.initialize_thrusters(4, longitudinal_control_inputs, 0.5, 60, stepsLong, increment); //thruster 2
 
 	//// Get the Dormand-Prince tableau
 	////RKTableauSS tableau_ss = dp45_tableau_ss();
-	//std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func = LinearStateSpace;
+	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func = LinearStateSpace;
 
 
 	////Perform simulation.
-	//Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, longitudinal_control_inputs, 0, simTime, stepsLong, Alongitudinal, Blongitudinal);
+	Eigen::MatrixXd solution_linear_long = rk4_simulate_ss(ss_func, Xlong_o, longitudinal_control_inputs, 0, simTime, stepsLong, Alongitudinal, Blongitudinal);
 	////Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 1000, 500, 0.03, tableau_ss,Alongitudinal, Blongitudinal);
 	////Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlong_o, Ulong_o, 0, 150, 300, Alongitudinal, Blongitudinal);
 
-	//fileName = "Linear Longitudinal Solution.csv";
-	//std::string file_longitudinal_control_inputs = "Linear Longitudinal Control Inputs.csv";
+	fileName = "Linear Longitudinal Solution.csv";
+	std::string file_longitudinal_control_inputs = "Linear Longitudinal Control Inputs.csv";
 
-	//outputToFile(solution_linear_long, fileName);
-	//outputToFile(longitudinal_control_inputs, file_longitudinal_control_inputs);
+	outputToFile(solution_linear_long, fileName);
+	outputToFile(longitudinal_control_inputs, file_longitudinal_control_inputs);
 
+	
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//// Lateral Simulation
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	//Initialize simulation variables.
+	double lateral_sim_time = 200;
+	double lateral_steps = 250;
+	double lateral_increment = simTime / lateral_steps;
 
+	//Initialize states
+	Eigen::VectorXd Xlateral_o(4);
+	Xlateral_o[0] = 0.5;
+	Xlateral_o[1] = 0.01;
+	Xlateral_o[2] = 0.01;
+	Xlateral_o[3] = 0.01;
 
-	//std::cout << "----------------------------------------- Start Lateral Model Process -------------------------------------------------" << std::endl;
-	//
-	////Initialize simulation variables.
-	//double lateral_sim_time = 200;
-	//double lateral_steps = 250;
-	//double lateral_increment = simTime / lateral_steps;
+	Eigen::MatrixXd lateral_control_inputs(number_of_controls, int(lateral_steps) + 1);
+	lateral_control_inputs.setZero();
 
-	////Initialize states
-	//Eigen::VectorXd Xlateral_o(4);
-	//Xlateral_o[0] = -1.99;
-	//Xlateral_o[1] = 0.183;
-	//Xlateral_o[2] = -0.0038;
-	//Xlateral_o[3] = 0.0038;
+	acl.initialize_deflections(0, lateral_control_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize aileron
+	acl.initialize_deflections(1, lateral_control_inputs, 10, -10, 10, 10, lateral_steps, increment); //initialize stabilizer
+	acl.initialize_deflections(2, lateral_control_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize rudder
+	acl.initialize_thrusters(3, lateral_control_inputs, 0.0, 60, lateral_steps, increment); //thruster 1
+	acl.initialize_thrusters(4, lateral_control_inputs, 0.0, 60, lateral_steps, increment); //thruster 2
 
-	//Eigen::MatrixXd lateral_control_inputs(number_of_controls, int(lateral_steps) + 1);
-	//lateral_control_inputs.setZero();
+	//tableau for adaptive RK.
+	//RKTableauSS tableau_ss = dp45_tableau_ss();
+	std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func_lateral = LinearStateSpace;
 
-	//acl.initialize_deflections(0, lateral_control_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize aileron
-	//acl.initialize_deflections(1, lateral_control_inputs, 10, -10, 10, 10, lateral_steps, increment); //initialize stabilizer
-	//acl.initialize_deflections(2, lateral_control_inputs, 0, 0, 0, 0, lateral_steps, increment); //initialize rudder
-	//acl.initialize_thrusters(3, lateral_control_inputs, 0.0, 60, lateral_steps, increment); //thruster 1
-	//acl.initialize_thrusters(4, lateral_control_inputs, 0.0, 60, lateral_steps, increment); //thruster 2
-	//
-	////Extract A matrix for lateral system.
-	//Eigen::MatrixXd Alateral = transformedA.block(4,4, 4,4);
-	//std::cout << "Alateral: " << std::endl;
-	//std::cout << Alateral << std::endl;
-	//std::cout << "A lateral eigenvalues: " << std::endl;
-	//std::cout << Alateral.eigenvalues() << std::endl;
+	//Perform simulation.
+	Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, lateral_control_inputs, 0, lateral_sim_time, lateral_steps, Alateral, Blateral);
+	//Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 1000, 500, 0.03, tableau_ss,Alateral, Blateral);
+	//Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 150, 300, Alateral, Blateral);
 
-	////Eigen::EigenSolver<Eigen::MatrixXd> eigenSolverLateral (Alateral); // Use EigenSolver to compute eigenvalues and eigenvectors
-	////std::cout << "Eigenvectors of A lateral: " << std::endl;
-	////std::cout << eigenSolverLateral.eigenvectors() << std::endl;
+	fileName = "Linear Lateral Solution.csv";
+	std::string file_lateral_control_inputs = "Linear Lateral Control Inputs.csv";
 
-	////Extract B matrix for lateral system.
-	//Eigen::MatrixXd Blateral = transformedB.block(4, 0, 4, 5);
-	//std::cout << "Blateral: " << std::endl;
-	//std::cout << Blateral << std::endl;
-
-
-	////tableau for adaptive RK.
-	////RKTableauSS tableau_ss = dp45_tableau_ss();
-	//std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)> ss_func_lateral = LinearStateSpace;
-
-	////Perform simulation.
-	//Eigen::MatrixXd solution_linear_lateral = rk4_simulate_ss(ss_func_lateral, Xlateral_o, lateral_control_inputs, 0, lateral_sim_time, lateral_steps, Alateral, Blateral);
-	////Eigen::MatrixXd solution_linear_long = adaptive_rk_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 1000, 500, 0.03, tableau_ss,Alateral, Blateral);
-	////Eigen::MatrixXd solution_linear_long = forward_euler_simulate_ss(ss_func, Xlateral_o, Ulateral_inputs, 0, 150, 300, Alateral, Blateral);
-
-	//fileName = "Linear Lateral Solution.csv";
-	//std::string file_lateral_control_inputs = "Linear Lateral Control Inputs.csv";
-
-	//outputToFile(solution_linear_lateral, fileName);
-	//outputToFile(lateral_control_inputs, file_lateral_control_inputs);
+	outputToFile(solution_linear_lateral, fileName);
+	outputToFile(lateral_control_inputs, file_lateral_control_inputs);
  
 	return 0;
 

@@ -20,13 +20,35 @@ Eigen::VectorXd phugoid() {
 	return Xlong_o;
 }
 
-Eigen::VectorXd short_period() {
+Eigen::VectorXd short_period_1() {
 
 	Eigen::VectorXd Xlong_o(4);
 	Xlong_o[0] = 0.03;
 	Xlong_o[1] = 1.99;
 	Xlong_o[2] = -1.0048;
 	Xlong_o[3] = 0.0199;
+
+	return Xlong_o;
+}
+
+Eigen::VectorXd short_period_2() {
+
+	Eigen::VectorXd Xlong_o(4);
+	Xlong_o[0] = 1.0;
+	Xlong_o[1] = 0.5;
+	Xlong_o[2] = 0.01;
+	Xlong_o[3] = 0.01;
+
+	return Xlong_o;
+}
+
+Eigen::VectorXd short_period_3() {
+
+	Eigen::VectorXd Xlong_o(4);
+	Xlong_o[0] = 0.0;
+	Xlong_o[1] = 0.5;
+	Xlong_o[2] = 0.01;
+	Xlong_o[3] = 0.0;
 
 	return Xlong_o;
 }
