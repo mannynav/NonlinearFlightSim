@@ -1,5 +1,11 @@
 #pragma once
 
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <iostream>
+#include <stdexcept>
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues> // Include Eigen's Eigenvalues module for eigenvalue and eigenvector computation
 

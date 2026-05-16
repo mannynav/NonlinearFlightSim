@@ -147,11 +147,24 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aircraft.h" />
+    <ClInclude Include="AircraftModel.h" />
+    <ClInclude Include="Attitudekinematics.h" />
+    <ClInclude Include="CheckCases.h" />
+    <ClInclude Include="CheckCaseValidator.h" />
+    <ClInclude Include="Constants.h" />
     <ClInclude Include="FlightModes.h" />
     <ClInclude Include="GravityModel.h" />
+    <ClInclude Include="GTMAeroTables.h" />
     <ClInclude Include="Input.h" />
+    <ClInclude Include="LinearSimulation.h" />
+    <ClInclude Include="LookupTable.h" />
+    <ClInclude Include="LookupTableTest.h" />
+    <ClInclude Include="ModeAnalysis.h" />
+    <ClInclude Include="NasaGTMAircraft.h" />
     <ClInclude Include="NumericalIntegration.h" />
     <ClInclude Include="Output.h" />
+    <ClInclude Include="PostProcessing.h" />
+    <ClInclude Include="SimulationEngine.h" />
     <ClInclude Include="TrimVerification.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>

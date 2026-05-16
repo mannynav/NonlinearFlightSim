@@ -1,5 +1,11 @@
 #pragma once
 
+#include <functional>
+#include <utility>      // for std::pair in adaptive_rk_step_ss
+#include <stdexcept>    // for std::invalid_argument
+#include <limits>       // for std::numeric_limits
+#include <cmath>        // for std::pow
+#include <vector>
 #include <Eigen/Dense>
 #include <numbers>
 #include <iostream>
@@ -8,8 +14,8 @@
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
 
-//Simple forward euler integration scheme
 
+//Simple forward euler integration scheme
 Eigen::MatrixXd forward_euler_simulate_ss(
 	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
 	const VectorXd& initial_x,
@@ -47,7 +53,6 @@ Eigen::MatrixXd forward_euler_simulate_ss(
 
 
 //4th order RK scheme
-
 Eigen::VectorXd rk4_step_ss(
 	const std::function<VectorXd(const VectorXd&, const VectorXd&, const MatrixXd&, const MatrixXd&)>& state_space_model,
 	const VectorXd& x_n,

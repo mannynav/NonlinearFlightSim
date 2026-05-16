@@ -1,11 +1,7 @@
 #pragma once
 
-
-/// <summary>
 /// Function to output a solution matrix to a file
-/// </summary>
-
-void outputToFile(Eigen::MatrixXd& solution, std::string& fileName)
+void outputToFile(const Eigen::MatrixXd& solution, const std::string& fileName)
 {
 	// --- Write the non linear solution matrix to a CSV file ---
 	std::ofstream outputFile(fileName);
@@ -28,7 +24,7 @@ void outputToFile(Eigen::MatrixXd& solution, std::string& fileName)
 
 }
 
-void outputToFileWithHeaders(Eigen::MatrixXd& solution, std::string& fileName)
+void outputToFileWithHeaders(const Eigen::MatrixXd& solution, const std::string& fileName)
 {
 
 	std::ofstream outputFile(fileName);
@@ -55,8 +51,6 @@ void outputToFileWithHeaders(Eigen::MatrixXd& solution, std::string& fileName)
 		std::cerr << "Unable to open file for writing: solution.csv" << std::endl;
 
 	}
-
-
 
 }
 
