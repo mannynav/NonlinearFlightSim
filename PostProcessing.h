@@ -1,6 +1,6 @@
-
 #pragma once
 
+#include "AtmosphereModel.h"
 #include "AttitudeKinematics.h"
 #include "Constants.h"
 #include <Eigen/Dense>
@@ -16,14 +16,16 @@
 //
 //  Converts the raw state-history matrix into a 29-row table of
 //  derived quantities (NED velocities, Euler angles in degrees,
-//  altitude in feet, angular rates in deg/s, etc.) suitable for
-//  plotting or downstream analysis.
+//  altitude in feet, angular rates in deg/s, atmospheric state,
+//  Mach, etc.) suitable for plotting or downstream analysis.
 //
-//  Rows 3-6 and 9-10 are reserved for an atmosphere model (sound
-//  speed, density, Mach, sideslip) that isn't wired in yet.
+//  Atmospheric quantities (SoS, density, Mach) are looked up
+//  from the AtmosphereData table at the current altitude.
 // ============================================================
+
 inline Eigen::MatrixXd postProcessNonlinearSolution(const Eigen::MatrixXd& X,
     const AttitudeKinematics& kin,
+    const AtmosphereData& atm,
     double sim_length, int steps)
 {
     using namespace constants;
@@ -43,16 +45,27 @@ inline Eigen::MatrixXd postProcessNonlinearSolution(const Eigen::MatrixXd& X,
         Eigen::Vector3d v_NED = R_n_b * Eigen::Vector3d(u, v, w);
         Eigen::Vector3d eul = kin.to_euler(att);
 
-        double alpha = (std::abs(u) < 1e-12) ? 0.0 : std::atan(w / u);
         double altitude_m = -z;
+        double airSpeed = std::sqrt(u * u + v * v + w * w);
+        double alpha = (std::abs(u) < 1e-12) ? 0.0 : std::atan(w / u);
+        double beta = (airSpeed > 1e-10) ? std::asin(v / airSpeed) : 0.0;
+
+        // Atmosphere lookups at current altitude
+        double c_mps = atm.speedOfSound(altitude_m);
+        double rho = atm.airDensity(altitude_m);
+        double mach = (c_mps > 1e-10) ? airSpeed / c_mps : 0.0;
 
         P(0, i) = i * dt;
         P(1, i) = altitude_m;
         P(2, i) = altitude_m * METERS_TO_FEET;
-        // Rows 3-6 reserved for atmosphere
+        P(3, i) = c_mps * METERS_TO_FEET;        // SoS in ft/s
+        P(4, i) = rho * KGM3_TO_SLUGFT3;       // density in slug/ft^3
+        P(5, i) = airSpeed * METERS_TO_FEET;        // true airspeed in ft/s
+        P(6, i) = mach;
         P(7, i) = alpha;
         P(8, i) = alpha * RAD_TO_DEG;
-        // Rows 9-10 reserved for sideslip
+        P(9, i) = beta;
+        P(10, i) = beta * RAD_TO_DEG;
         P(11, i) = v_NED[0];
         P(12, i) = v_NED[1];
         P(13, i) = v_NED[2];

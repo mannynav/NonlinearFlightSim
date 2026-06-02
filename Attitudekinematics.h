@@ -76,6 +76,7 @@ namespace quat {
 //    - normalization (no-op for Euler, |q|=1 for quaternion)
 //    - long/lat decoupling permutation
 // ============================================================
+
 class AttitudeKinematics
 {
 public:
@@ -174,7 +175,7 @@ public:
         double cphi = std::cos(phi), sphi = std::sin(phi);
         double cth = std::cos(theta), tth = std::tan(theta);
 
-        // Standard 3-2-1 inverse kinematics (note: row 2 has -sin(phi), not +)
+        // Standard 3-2-1 inverse kinematics/
         Eigen::Matrix3d H;
         H << 1.0, sphi* tth, cphi* tth,
             0.0, cphi, -sphi,

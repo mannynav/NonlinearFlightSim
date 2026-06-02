@@ -2,19 +2,23 @@
 #pragma once
 
 #include "AircraftModel.h"
+#include "EngineModel.h"
 #include <Eigen/Dense>
 #include <numbers>
 #include <map>
 #include <cmath>
+#include <memory>
 
 
 // ============================================================
 //  CivilAircraft — large twin-engine transport (~120,000 kg)
 //
-//  Inherits from AircraftModel. Implements the three required
-//  airframe methods:  aerodynamic_forces_stability_axis,
-//  engine_forces_body_frame, cg_moments_body_frame.
+//  Two GravityScaledEngine units (throttle indices 3 and 4),
+//  managed by the base-class engines_ vector. Engine force and
+//  engine moment are computed by AircraftModel; this class only
+//  implements aerodynamics and the aerodynamic moment buildup.
 // ============================================================
+
 class CivilAircraft : public AircraftModel
 {
 public:
@@ -56,6 +60,20 @@ public:
         slope_coefficient_of_lift = 5.5;
         a3 = -768.5;  a2 = 609.2;  a1 = -155.2;  a0 = -15.212;
         alpha_switch = 14.5 * (pi / 180);
+
+        // ---- Engines ----
+        // position_cg = (eng_x - cg_x, eng_y - cg_y, cg_z - eng_z)
+        // The y and z components reproduce the original engine-moment.
+        engines_.push_back(std::make_unique<GravityScaledEngine>(
+            Eigen::Vector3d(eng1_x_pos_Fm - x_cg_pos_Fm,
+                eng1_y_pos_Fm - y_cg_pos_Fm,
+                z_cg_pos_Fm - eng1_z_pos_Fm),
+            /*throttle_index=*/3));
+        engines_.push_back(std::make_unique<GravityScaledEngine>(
+            Eigen::Vector3d(eng2_x_pos_Fm - x_cg_pos_Fm,
+                eng2_y_pos_Fm - y_cg_pos_Fm,
+                z_cg_pos_Fm - eng2_z_pos_Fm),
+            /*throttle_index=*/4));
     }
 
 
@@ -85,15 +103,6 @@ public:
     }
 
 
-    // ---- Engine forces in body frame ----
-    Eigen::Vector3d engine_forces_body_frame(double g) override
-    {
-        double T1 = throttle1_inp * mass * g;
-        double T2 = throttle2_inp * mass * g;
-        return Eigen::Vector3d(T1 + T2, 0.0, 0.0);
-    }
-
-
     // ---- Moments about CG in body frame ----
     Eigen::Vector3d cg_moments_body_frame(Eigen::Matrix3d& rot_stab_to_body,
         Eigen::Vector3d& omega_b,
@@ -102,19 +111,22 @@ public:
     {
         double eps_dn = depsda * (alpha - alpha_initial);
         double eta11 = -1.4 * beta;
-        double eta21 = -0.59 - (3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord)) * (alpha - eps_dn);
+        double eta21 = -0.59 - (3.1 * (tail_planform_area * lt) /
+            (wing_planform_area * mean_aerodynamic_chord)) * (alpha - eps_dn);
         double eta31 = (1 - alpha * (180 / (15 * pi))) * beta;
         Eigen::Vector3d eta(eta11, eta21, eta31);
 
         Eigen::MatrixXd corr(3, 3);
         corr << -11, 0, 5,
-            0, -4.03 * (tail_planform_area * lt * lt) / (wing_planform_area * mean_aerodynamic_chord * mean_aerodynamic_chord), 0,
+            0, -4.03 * (tail_planform_area * lt * lt) /
+            (wing_planform_area * mean_aerodynamic_chord * mean_aerodynamic_chord), 0,
             1.7, 0, -11.5;
         Eigen::MatrixXd dCMdx = (mean_aerodynamic_chord / airSpeed) * corr;
 
         Eigen::MatrixXd dCMdu(3, 3);
         dCMdu << -0.6, 0, 0.22,
-            0, -3.1 * (tail_planform_area * lt) / (wing_planform_area * mean_aerodynamic_chord), 0,
+            0, -3.1 * (tail_planform_area * lt) /
+            (wing_planform_area * mean_aerodynamic_chord), 0,
             0, 0, -0.63;
 
         Eigen::Vector3d uVec(aileron_inp, stabilizer_inp, rudder_inp);
@@ -123,13 +135,12 @@ public:
 
         Eigen::Vector3d rcg(x_cg_pos_Fm, y_cg_pos_Fm, z_cg_pos_Fm);
         Eigen::Vector3d rac(x_aero_pos_Fm, y_aero_pos_Fm, z_aero_pos_Fm);
-        Eigen::Vector3d MAcg_b = MAac_b + aerodynamic_forces_body_frame(alpha, beta, airSpeed, dynamicPressure, rot_stab_to_body).cross(rcg - rac);
+        Eigen::Vector3d MAcg_b = MAac_b
+            + aerodynamic_forces_body_frame(alpha, beta, airSpeed, dynamicPressure,
+                rot_stab_to_body).cross(rcg - rac);
 
-        Eigen::Vector3d arm1(x_cg_pos_Fm - eng1_x_pos_Fm, eng1_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng1_z_pos_Fm);
-        Eigen::Vector3d arm2(x_cg_pos_Fm - eng2_x_pos_Fm, eng2_y_pos_Fm - y_cg_pos_Fm, z_cg_pos_Fm - eng2_z_pos_Fm);
-        Eigen::Vector3d F1(throttle1_inp * mass * g, 0, 0);
-        Eigen::Vector3d F2(throttle2_inp * mass * g, 0, 0);
-        Eigen::Vector3d M_eng = arm1.cross(F1) + arm2.cross(F2);
+        // Engine moments now come from the base-class engine loop
+        Eigen::Vector3d M_eng = engine_moments_body_frame(g);
 
         Eigen::Vector3d M_total = MAcg_b + M_eng;
         return InverseInertiaMatrix * (M_total - omega_b.cross(InertiaMatrix * omega_b));

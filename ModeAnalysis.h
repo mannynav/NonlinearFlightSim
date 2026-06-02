@@ -20,6 +20,7 @@
 //  4x4 longitudinal / lateral blocks after the long/lat similarity
 //  transform.
 // ============================================================
+
 inline void printModeAnalysis(const std::string& label, const Eigen::MatrixXd& A_block)
 {
     Eigen::EigenSolver<Eigen::MatrixXd> solver(A_block);

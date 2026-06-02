@@ -13,12 +13,12 @@
 //             https://nescacademy.nasa.gov/flightsim
 //             https://github.com/nasa/simupy-flight
 //
-//  These are NOT aircraft — they are rigid-body fixtures used
+//  These are rigid-body fixtures used
 //  to verify the equations-of-motion implementation. They share
 //  the AircraftModel interface so the same simulation pipeline
 //  can run them with no special-casing in Aircraft_Sim.
 //
-//  CAVEAT — the official NESC trajectories use J2 gravity and
+//  The official NESC trajectories use J2 gravity and
 //  the WGS-84 ellipsoid; this sim uses constant gravity and
 //  flat-Earth navigation, so bit-for-bit match against the NESC
 //  reference data is not possible. However the cases still test
@@ -44,7 +44,7 @@ public:
         intializeControlInputs(controls);
 
         // Mass cancels out for a no-drag sphere under gravity, so the
-        // exact value doesn't affect the trajectory. Use 1 kg.
+        // exact value doesn't affect the trajectory.
         mass = 1.0;
 
         // Inertia is irrelevant (no torques). Use unit-diagonal.
@@ -146,9 +146,6 @@ public:
 //  Tests that rate-damping torques are integrated correctly:
 //  rotational KE should decrease monotonically while the body
 //  continues to tumble.
-//
-//  The damping matrix below is REPRESENTATIVE — adjust to match
-//  exact NESC Case 3 coefficients if you have them.
 // ============================================================
 class DampedTumblingBrick : public AircraftModel
 {

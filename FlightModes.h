@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////// This header contains functions to set states of linear Civil Aircraft to certain conditions
 ///// to investigate flight modes

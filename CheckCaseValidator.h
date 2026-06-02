@@ -19,8 +19,7 @@
 //  NESC Check-Case Validator
 //
 //  Drives the simulation with the rigid-body fixtures defined in
-//  CheckCases.h and reports conservation diagnostics. A correct
-//  6-DOF implementation should:
+//  CheckCases.h and reports conservation diagnostics.
 //
 //    Case 1 (sphere)  : conserve total mechanical energy E = mgh + ½mv²
 //                        and keep horizontal velocity at exactly zero
@@ -140,7 +139,6 @@ namespace nesc_internal {
         }
         return sol;
     }
-
 } // namespace nesc_internal
 
 

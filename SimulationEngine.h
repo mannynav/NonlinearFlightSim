@@ -1,9 +1,8 @@
-
 #pragma once
 
 #include "AircraftModel.h"
+#include "AtmosphereModel.h"
 #include "AttitudeKinematics.h"
-#include "GravityModel.h"
 #include "Constants.h"
 #include <Eigen/Dense>
 #include <cmath>
@@ -17,6 +16,10 @@
 //  attitude representation is in use — they take both as
 //  parameters and dispatch through the AircraftModel and
 //  AttitudeKinematics interfaces.
+//
+//  Environment (air density and gravity) is supplied via the
+//  AtmosphereData table and looked up at the current altitude
+//  on every evaluation.
 // ============================================================
 
 
@@ -39,7 +42,7 @@ inline Eigen::VectorXd Aircraft_Sim(AircraftModel& aircraft,
     const AttitudeKinematics& kin,
     const Eigen::VectorXd& X,
     const Eigen::VectorXd& U,
-    const GravityModel& gravity_model)
+    const AtmosphereData& atm)
 {
     aircraft.initializeStates(X);
     aircraft.intializeControlInputs(U);
@@ -48,8 +51,11 @@ inline Eigen::VectorXd Aircraft_Sim(AircraftModel& aircraft,
     double p = X[3], q = X[4], r = X[5];
     Eigen::VectorXd att = X.segment(kin.attitude_start_idx(), kin.n_attitude());
 
-    constexpr double rho = 1.225;
-    constexpr double g = 9.81;
+    // ---- Atmosphere lookup at current altitude (NED: altitude = -z_pos) ----
+    const double z_pos = X[kin.position_start_idx() + 2];
+    const double altitude = -z_pos;
+    const double rho = atm.airDensity(altitude);
+    const double g = atm.gravity(altitude);
 
     double airSpeed = std::sqrt(u * u + v * v + w * w);
     double alpha = (airSpeed > 1e-10) ? std::atan2(w, u) : 0.0;
@@ -94,9 +100,9 @@ inline Eigen::VectorXd Implicit_Model(AircraftModel& ac,
     const Eigen::VectorXd& XDOT,
     const Eigen::VectorXd& X,
     const Eigen::VectorXd& U,
-    const GravityModel& gravity_model)
+    const AtmosphereData& atm)
 {
-    return Aircraft_Sim(ac, kin, X, U, gravity_model) - XDOT;
+    return Aircraft_Sim(ac, kin, X, U, atm) - XDOT;
 }
 
 
@@ -107,7 +113,7 @@ inline Eigen::MatrixXd LinearizeSystem_A(AircraftModel& ac,
     const Eigen::VectorXd& Xo,
     const Eigen::VectorXd& Uo,
     const Eigen::MatrixXd& DX,
-    const GravityModel& gravity_model)
+    const AtmosphereData& atm)
 {
     int n = static_cast<int>(XDOTo.size());
     Eigen::MatrixXd A(n, n);
@@ -116,8 +122,8 @@ inline Eigen::MatrixXd LinearizeSystem_A(AircraftModel& ac,
             double dx = DX(i, j);
             Eigen::VectorXd x_plus = Xo;  x_plus(j) += dx;
             Eigen::VectorXd x_minus = Xo;  x_minus(j) -= dx;
-            double Fp = Implicit_Model(ac, kin, XDOTo, x_plus, Uo, gravity_model)[i];
-            double Fm = Implicit_Model(ac, kin, XDOTo, x_minus, Uo, gravity_model)[i];
+            double Fp = Implicit_Model(ac, kin, XDOTo, x_plus, Uo, atm)[i];
+            double Fm = Implicit_Model(ac, kin, XDOTo, x_minus, Uo, atm)[i];
             A(i, j) = (Fp - Fm) / (2.0 * dx);
         }
     }
@@ -132,7 +138,7 @@ inline Eigen::MatrixXd LinearizeSystem_B(AircraftModel& ac,
     const Eigen::VectorXd& Xo,
     const Eigen::VectorXd& Uo,
     const Eigen::MatrixXd& DU,
-    const GravityModel& gravity_model)
+    const AtmosphereData& atm)
 {
     int n = static_cast<int>(XDOTo.size());
     int m = static_cast<int>(Uo.size());
@@ -142,8 +148,8 @@ inline Eigen::MatrixXd LinearizeSystem_B(AircraftModel& ac,
             double du = DU(i, j);
             Eigen::VectorXd u_plus = Uo;  u_plus(j) += du;
             Eigen::VectorXd u_minus = Uo;  u_minus(j) -= du;
-            double Fp = Implicit_Model(ac, kin, XDOTo, Xo, u_plus, gravity_model)[i];
-            double Fm = Implicit_Model(ac, kin, XDOTo, Xo, u_minus, gravity_model)[i];
+            double Fp = Implicit_Model(ac, kin, XDOTo, Xo, u_plus, atm)[i];
+            double Fm = Implicit_Model(ac, kin, XDOTo, Xo, u_minus, atm)[i];
             B(i, j) = (Fp - Fm) / (2.0 * du);
         }
     }
@@ -166,7 +172,7 @@ inline Eigen::MatrixXd runNonlinearSimulation(AircraftModel& ac,
     const AttitudeKinematics& kin,
     const Eigen::VectorXd& X0,
     const Eigen::VectorXd& U0,
-    const GravityModel& gravity_model,
+    const AtmosphereData& atm,
     double sim_length, int steps)
 {
     const double dt = sim_length / steps;
@@ -178,10 +184,10 @@ inline Eigen::MatrixXd runNonlinearSimulation(AircraftModel& ac,
 
     for (int i = 0; i < steps; i++) {
         Eigen::VectorXd Xk = sol.col(i);
-        Eigen::VectorXd k1 = Aircraft_Sim(ac, kin, Xk, U, gravity_model);
-        Eigen::VectorXd k2 = Aircraft_Sim(ac, kin, (Xk + 0.5 * dt * k1).eval(), U, gravity_model);
-        Eigen::VectorXd k3 = Aircraft_Sim(ac, kin, (Xk + 0.5 * dt * k2).eval(), U, gravity_model);
-        Eigen::VectorXd k4 = Aircraft_Sim(ac, kin, (Xk + dt * k3).eval(), U, gravity_model);
+        Eigen::VectorXd k1 = Aircraft_Sim(ac, kin, Xk, U, atm);
+        Eigen::VectorXd k2 = Aircraft_Sim(ac, kin, (Xk + 0.5 * dt * k1).eval(), U, atm);
+        Eigen::VectorXd k3 = Aircraft_Sim(ac, kin, (Xk + 0.5 * dt * k2).eval(), U, atm);
+        Eigen::VectorXd k4 = Aircraft_Sim(ac, kin, (Xk + dt * k3).eval(), U, atm);
         Eigen::VectorXd Xn = Xk + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4);
 
         Eigen::VectorXd att = Xn.segment(kin.attitude_start_idx(), kin.n_attitude());

@@ -21,6 +21,7 @@
 //  Used for both longitudinal (stabilizer doublet) and lateral
 //  (aileron doublet) excitation campaigns.
 // ============================================================
+
 inline Eigen::MatrixXd runLinearSubsystemSim(AircraftModel& ac,
     const Eigen::MatrixXd& A_sub,
     const Eigen::MatrixXd& B_sub,

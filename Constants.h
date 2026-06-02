@@ -11,5 +11,6 @@ namespace constants {
     constexpr double DEG_TO_RAD = PI / 180.0;
     constexpr double RAD_TO_DEG = 180.0 / PI;
     constexpr double METERS_TO_FEET = 3.28084;
+    constexpr double KGM3_TO_SLUGFT3 = 0.001941811;
     constexpr int    NUM_CONTROLS = 5;
 }

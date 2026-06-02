@@ -7,193 +7,298 @@
 
 
 // ============================================================
-//  GTM Aerodynamic Coefficient Tables
+//  GTM Aerodynamic Coefficient Tables — REAL DATA
 //
-//  Hand-authored placeholder data with transport-class
-//  characteristics. Built so a NasaGTM simulation runs and
-//  behaves plausibly through stall.
+//  Extracted from the NASA T2 polynomial aerodatabase v0.2
+//  (Cunis et al., unlimited distribution release). The .mat
+//  source file is part of GTM_DesignSim:
+//      https://github.com/nasa/GTM_DesignSim
 //
-//  Replace with real NASA GTM data extracted from MATLAB tables
-//  in github.com/nasa/GTM_DesignSim. Grid layout and units below
-//  are designed to drop in cleanly once real data is available.
+//  Original storage in body axes [CX, CY, CZ, Cl, Cm, Cn] with
+//  full alpha (-5..85 deg) and beta (-45..45 deg) coverage.
+//    - Longitudinal tables: beta=0 slice, alpha in [-5, 20]
+//    - Lateral tables:      alpha=0 slice, beta in [-15, 15]
+//    - Rate damping:        slope at zero rate, 1D in alpha
+//    - Stability axes:      CD, CL obtained from CX, CZ via the
+//                           alpha rotation [CD,CL] = R(a)*[-CX,-CZ]
 //
-//  Units throughout: angles in RADIANS, coefficients dimensionless.
-//  Coefficient sign conventions match the original CivilAircraft
-//  polynomial model:
-//    Cm_η < 0      — positive stabilizer pitches the nose down
-//    Cl_δa < 0     — positive aileron rolls the body negatively
-//    Cn_δr < 0     — positive rudder yaws the body negatively
+//  Stabilizer setting fixed at 0 deg; elevator (eta) varies.
+//  Rudder mirrored via anti-symmetry from negative-only data.
+//  Right-aileron-only data used directly (matches NASA convention).
+//
+//  Units: angles in RADIANS, coefficients dimensionless.
 // ============================================================
+
 namespace gtm_aero {
 
     constexpr double D2R = std::numbers::pi / 180.0;
 
 
     // ============================================================
-    //  Longitudinal — functions of α and η (stabilizer)
-    //  α grid: 9 points, refined near stall at 14°
-    //  η grid: 6 points across full stabilizer travel
+    //  Longitudinal — functions of alpha and eta (elevator)
+    //  16 alpha breakpoints x 6 elevator breakpoints
     // ============================================================
     inline Eigen::VectorXd alpha_grid_long()
     {
-        Eigen::VectorXd a(9);
-        a << -5, 0, 4, 8, 12, 14, 16, 18, 20;
+        Eigen::VectorXd a(16);
+        a << -5, 0, 2, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20;
         return a * D2R;
     }
 
     inline Eigen::VectorXd eta_grid_long()
     {
         Eigen::VectorXd e(6);
-        e << -25, -15, -5, 0, 5, 10;
+        e << -30, -20, -10, 0, 10, 20;
         return e * D2R;
     }
 
 
-    // ---------- CL(α, η) — total static lift ----------
+    // ---------- CL(alpha, eta) — total static lift ----------
     inline LookupTable<2> build_cl_table()
     {
         auto alpha_grid = alpha_grid_long();
         auto eta_grid = eta_grid_long();
 
-        // CL_base(α) at η = 0 — transport lift curve with stall at ~14°
-        const double cl_base[9] = {
-            -0.30, 0.20, 0.70, 1.10, 1.40, 1.50, 1.40, 1.20, 1.05
-        };
-        const double dcl_deta = 0.8;   // stabilizer effectiveness (per radian)
-
-        Eigen::VectorXd data(9 * 6);
-        for (int i = 0; i < 9; ++i)
-            for (int j = 0; j < 6; ++j)
-                data[i * 6 + j] = cl_base[i] + dcl_deta * eta_grid[j];
+        Eigen::VectorXd data(96);
+        data <<
+            -0.580007, -0.550883, -0.481824, -0.405964, -0.326424, -0.230789,
+            -0.153068, -0.122914, -0.061664, +0.022003, +0.102668, +0.185474,
+            +0.031664, +0.057944, +0.119330, +0.203082, +0.285038, +0.368498,
+            +0.207245, +0.225684, +0.292234, +0.375392, +0.459047, +0.539564,
+            +0.375603, +0.390154, +0.457963, +0.540930, +0.624726, +0.691805,
+            +0.533547, +0.546588, +0.614674, +0.696867, +0.780017, +0.843505,
+            +0.618463, +0.629281, +0.694688, +0.777859, +0.859368, +0.925594,
+            +0.694083, +0.699440, +0.764129, +0.846886, +0.926525, +0.994194,
+            +0.748288, +0.750594, +0.815128, +0.897529, +0.975008, +1.042588,
+            +0.775710, +0.777382, +0.842643, +0.924629, +0.998584, +1.066438,
+            +0.791797, +0.795074, +0.860620, +0.942366, +1.012670, +1.078409,
+            +0.808724, +0.812649, +0.878691, +0.960149, +1.027493, +1.092258,
+            +0.825238, +0.833381, +0.897440, +0.977847, +1.044048, +1.104994,
+            +0.840005, +0.849445, +0.912571, +0.991352, +1.056379, +1.116122,
+            +0.871104, +0.883555, +0.940854, +1.017387, +1.081867, +1.132180,
+            +0.907741, +0.921721, +0.970888, +1.045165, +1.106115, +1.150771;
 
         return LookupTable<2>({ alpha_grid, eta_grid }, data);
     }
 
 
-    // ---------- CD(α, η) — total drag ----------
-    //   Base drag polar grows roughly with CL²; post-stall drag rises
-    //   sharply. Stabilizer trim drag added as a quadratic in η.
+    // ---------- CD(alpha, eta) — total drag ----------
     inline LookupTable<2> build_cd_table()
     {
         auto alpha_grid = alpha_grid_long();
         auto eta_grid = eta_grid_long();
 
-        // CD_base(α) at η = 0 — transport drag polar with post-stall rise
-        const double cd_base[9] = {
-            0.045, 0.024, 0.045, 0.090, 0.150, 0.190, 0.270, 0.380, 0.510
-        };
+        Eigen::VectorXd data(96);
+        data <<
+            +0.081432, +0.065375, +0.050712, +0.052863, +0.050314, +0.057364,
+            +0.044582, +0.029192, +0.024272, +0.028391, +0.030671, +0.042229,
+            +0.042303, +0.028232, +0.026269, +0.030957, +0.034349, +0.049059,
+            +0.044126, +0.030634, +0.030895, +0.035949, +0.041403, +0.057612,
+            +0.062960, +0.050138, +0.052755, +0.058268, +0.065491, +0.081990,
+            +0.068571, +0.057628, +0.062991, +0.068834, +0.077852, +0.095267,
+            +0.079047, +0.068957, +0.075780, +0.082365, +0.091479, +0.109871,
+            +0.077216, +0.068034, +0.076980, +0.084048, +0.093668, +0.112628,
+            +0.097288, +0.089562, +0.101192, +0.108994, +0.117972, +0.139608,
+            +0.130968, +0.124385, +0.136413, +0.145278, +0.156132, +0.178066,
+            +0.167042, +0.162083, +0.172810, +0.182016, +0.195069, +0.216818,
+            +0.201705, +0.196116, +0.205523, +0.215568, +0.231172, +0.253991,
+            +0.233147, +0.227189, +0.237923, +0.248244, +0.265935, +0.290140,
+            +0.261976, +0.256867, +0.269636, +0.280133, +0.299498, +0.324162,
+            +0.313224, +0.309196, +0.325805, +0.337744, +0.359791, +0.385364,
+            +0.363321, +0.358577, +0.376837, +0.390321, +0.414081, +0.442322;
 
-        Eigen::VectorXd data(9 * 6);
-        for (int i = 0; i < 9; ++i) {
-            for (int j = 0; j < 6; ++j) {
-                const double eta_deg = eta_grid[j] / D2R;
-                const double dcd_eta = 1.5e-4 * eta_deg * eta_deg;  // quadratic trim drag
-                data[i * 6 + j] = cd_base[i] + dcd_eta;
-            }
-        }
         return LookupTable<2>({ alpha_grid, eta_grid }, data);
     }
 
 
-    // ---------- Cm(α, η) — pitch moment about CG ----------
-    //   Statically stable through stall; sign convention matches the
-    //   original polynomial (Cm_η ≈ -2.9/rad).
+    // ---------- Cm(alpha, eta) — pitch moment ----------
     inline LookupTable<2> build_cm_table()
     {
         auto alpha_grid = alpha_grid_long();
         auto eta_grid = eta_grid_long();
 
-        // Cm_base(α) at η = 0 — slight pitch-up past stall
-        const double cm_base[9] = {
-            +0.178, -0.467, -0.609, -0.751, -0.894, -0.965, -1.100, -1.200, -1.100
-        };
-        const double dcm_deta = -2.91;   // stabilizer effectiveness (per radian)
-
-        Eigen::VectorXd data(9 * 6);
-        for (int i = 0; i < 9; ++i)
-            for (int j = 0; j < 6; ++j)
-                data[i * 6 + j] = cm_base[i] + dcm_deta * eta_grid[j];
+        Eigen::VectorXd data(96);
+        data <<
+            +1.022877, +0.874350, +0.655467, +0.313148, -0.004834, -0.310540,
+            +0.863980, +0.737956, +0.497151, +0.155619, -0.160665, -0.470881,
+            +0.805803, +0.693904, +0.441190, +0.102363, -0.211681, -0.520175,
+            +0.751044, +0.650781, +0.380215, +0.045960, -0.263838, -0.570049,
+            +0.695521, +0.598569, +0.318857, -0.011651, -0.321034, -0.612630,
+            +0.643112, +0.553179, +0.272478, -0.052597, -0.358634, -0.641309,
+            +0.616944, +0.537792, +0.256716, -0.064053, -0.363064, -0.644512,
+            +0.583553, +0.514226, +0.236956, -0.081168, -0.373337, -0.656218,
+            +0.558776, +0.493808, +0.223886, -0.094582, -0.379660, -0.662801,
+            +0.534655, +0.476060, +0.199975, -0.112318, -0.390892, -0.670236,
+            +0.527578, +0.467373, +0.189063, -0.118518, -0.393005, -0.664540,
+            +0.476064, +0.422050, +0.143978, -0.161682, -0.432306, -0.699482,
+            +0.409146, +0.351342, +0.074989, -0.226081, -0.495486, -0.762869,
+            +0.316329, +0.258267, -0.024490, -0.319547, -0.582639, -0.839105,
+            +0.196229, +0.135419, -0.143128, -0.430416, -0.672212, -0.902220,
+            +0.116216, +0.059314, -0.200556, -0.479524, -0.708443, -0.911518;
 
         return LookupTable<2>({ alpha_grid, eta_grid }, data);
     }
 
 
     // ============================================================
-    //  Lateral — functions of β and primary lateral control
-    //  β grid: 7 points (-15° to +15°)
-    //  Primary control varies by coefficient
+    //  Lateral — sliced at alpha=0 deg
+    //  15 beta breakpoints x 7 control breakpoints
     // ============================================================
     inline Eigen::VectorXd beta_grid_lat()
     {
-        Eigen::VectorXd b(7);
-        b << -15, -10, -5, 0, 5, 10, 15;
+        Eigen::VectorXd b(15);
+        b << -15, -12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12, 15;
         return b * D2R;
     }
 
 
-    // ---------- CY(β, δr) — side force ----------
+    // ---------- CY(beta, dr) — side force ----------
     inline LookupTable<2> build_cy_table()
     {
         auto beta_grid = beta_grid_lat();
 
-        Eigen::VectorXd dr_grid(5);
-        dr_grid << -30, -15, 0, 15, 30;
+        Eigen::VectorXd dr_grid(7);
+        dr_grid << -45, -30, -10, 0, 10, 30, 45;
         dr_grid *= D2R;
 
-        // Linear in both variables: CY = -1.7·β + 0.25·δr
-        const double Cy_beta = -1.7;
-        const double Cy_dr = 0.25;
-
-        Eigen::VectorXd data(7 * 5);
-        for (int i = 0; i < 7; ++i)
-            for (int j = 0; j < 5; ++j)
-                data[i * 5 + j] = Cy_beta * beta_grid[i] + Cy_dr * dr_grid[j];
+        Eigen::VectorXd data(105);
+        data <<
+            +0.125770, +0.128218, +0.209291, +0.259986, +0.310681, +0.391754, +0.394202,
+            +0.071789, +0.074239, +0.154541, +0.207989, +0.261437, +0.341739, +0.344189,
+            +0.035924, +0.038846, +0.118323, +0.173324, +0.228325, +0.307802, +0.310724,
+            +0.000257, +0.003976, +0.082376, +0.138659, +0.194943, +0.273342, +0.277062,
+            -0.035128, -0.030339, +0.046731, +0.103994, +0.161258, +0.238328, +0.243117,
+            -0.070146, -0.064072, +0.011417, +0.069330, +0.127242, +0.202732, +0.208805,
+            -0.104717, -0.097207, -0.023546, +0.034665, +0.092876, +0.166537, +0.174047,
+            -0.138766, -0.129732, -0.058143, +0.000000, +0.058143, +0.129732, +0.138766,
+            -0.172222, -0.161643, -0.092362, -0.034665, +0.023033, +0.092313, +0.102893,
+            -0.205021, -0.192944, -0.126199, -0.069330, -0.012460, +0.054285, +0.066362,
+            -0.237107, -0.223647, -0.159654, -0.103994, -0.048335, +0.015658, +0.029118,
+            -0.268433, -0.253768, -0.192730, -0.138659, -0.084588, -0.023551, -0.008885,
+            -0.298963, -0.283334, -0.225438, -0.173324, -0.121210, -0.063314, -0.047685,
+            -0.328673, -0.312377, -0.257792, -0.207989, -0.158186, -0.103601, -0.087305,
+            -0.371676, -0.355052, -0.305700, -0.259986, -0.214272, -0.164921, -0.148296;
 
         return LookupTable<2>({ beta_grid, dr_grid }, data);
     }
 
 
-    // ---------- Cl(β, δa) — roll moment ----------
+    // ---------- Cl(beta, da) — roll moment ----------
     inline LookupTable<2> build_cl_roll_table()
     {
         auto beta_grid = beta_grid_lat();
 
-        Eigen::VectorXd da_grid(5);
-        da_grid << -25, -10, 0, 10, 25;
+        Eigen::VectorXd da_grid(7);
+        da_grid << -30, -20, -10, 0, 10, 20, 30;
         da_grid *= D2R;
 
-        // Cl_β (dihedral effect) and Cl_δa (aileron) matching original sign convention
-        const double Cl_beta = -1.5;
-        const double Cl_da = -0.6;
-
-        Eigen::VectorXd data(7 * 5);
-        for (int i = 0; i < 7; ++i)
-            for (int j = 0; j < 5; ++j)
-                data[i * 5 + j] = Cl_beta * beta_grid[i] + Cl_da * da_grid[j];
+        Eigen::VectorXd data(105);
+        data <<
+            +0.048096, +0.041685, +0.037366, +0.030497, +0.025712, +0.022170, +0.020727,
+            +0.043609, +0.037221, +0.032384, +0.025212, +0.020200, +0.016680, +0.015158,
+            +0.040283, +0.033923, +0.028769, +0.021378, +0.016220, +0.012709, +0.011189,
+            +0.036728, +0.030406, +0.024958, +0.017344, +0.012040, +0.008533, +0.007053,
+            +0.032979, +0.026704, +0.020991, +0.013148, +0.007702, +0.004191, +0.002786,
+            +0.029074, +0.022855, +0.016904, +0.008833, +0.003247, -0.000276, -0.001576,
+            +0.025050, +0.018897, +0.012737, +0.004436, -0.001282, -0.004824, -0.005997,
+            +0.020946, +0.014868, +0.008530, +0.000000, -0.005840, -0.009411, -0.010441,
+            +0.016803, +0.010808, +0.004323, -0.004436, -0.010384, -0.013991, -0.014871,
+            +0.012661, +0.006759, +0.000156, -0.008833, -0.014870, -0.018521, -0.019250,
+            +0.008560, +0.002759, -0.003931, -0.013148, -0.019253, -0.022956, -0.023543,
+            +0.004540, -0.001150, -0.007898, -0.017344, -0.023491, -0.027252, -0.027713,
+            +0.000642, -0.004929, -0.011709, -0.021378, -0.027541, -0.031367, -0.031723,
+            -0.003096, -0.008542, -0.015324, -0.025212, -0.031364, -0.035259, -0.035540,
+            -0.008318, -0.013565, -0.020306, -0.030497, -0.036585, -0.040594, -0.040828;
 
         return LookupTable<2>({ beta_grid, da_grid }, data);
     }
 
 
-    // ---------- Cn(β, δr) — yaw moment ----------
+    // ---------- Cn(beta, dr) — yaw moment ----------
     inline LookupTable<2> build_cn_table()
     {
         auto beta_grid = beta_grid_lat();
 
-        Eigen::VectorXd dr_grid(5);
-        dr_grid << -30, -15, 0, 15, 30;
+        Eigen::VectorXd dr_grid(7);
+        dr_grid << -45, -30, -10, 0, 10, 30, 45;
         dr_grid *= D2R;
 
-        // Cn_β (weathercock stability) and Cn_δr (rudder)
-        const double Cn_beta = 1.0;
-        const double Cn_dr = -0.66;
-
-        Eigen::VectorXd data(7 * 5);
-        for (int i = 0; i < 7; ++i)
-            for (int j = 0; j < 5; ++j)
-                data[i * 5 + j] = Cn_beta * beta_grid[i] + Cn_dr * dr_grid[j];
+        Eigen::VectorXd data(105);
+        data <<
+            +0.016207, +0.013749, -0.027465, -0.054281, -0.081097, -0.122311, -0.124769,
+            +0.026739, +0.024570, -0.016285, -0.044525, -0.072764, -0.113619, -0.115788,
+            +0.034116, +0.031886, -0.008611, -0.037601, -0.066592, -0.107089, -0.109319,
+            +0.041677, +0.039206, -0.000836, -0.030407, -0.059978, -0.100020, -0.102491,
+            +0.049330, +0.046466, +0.006978, -0.022995, -0.052969, -0.092457, -0.095321,
+            +0.056981, +0.053604, +0.014769, -0.015421, -0.045610, -0.084445, -0.087823,
+            +0.064532, +0.060557, +0.022477, -0.007737, -0.037952, -0.076032, -0.080007,
+            +0.071884, +0.067269, +0.030043, +0.000000, -0.030043, -0.067269, -0.071884,
+            +0.078943, +0.073683, +0.037412, +0.007737, -0.021937, -0.058208, -0.063468,
+            +0.085614, +0.079746, +0.044532, +0.015421, -0.013691, -0.048904, -0.054773,
+            +0.091809, +0.085409, +0.051353, +0.022995, -0.005362, -0.039419, -0.045819,
+            +0.097446, +0.090628, +0.057827, +0.030407, +0.002987, -0.029814, -0.036632,
+            +0.102450, +0.095361, +0.063911, +0.037601, +0.011292, -0.020158, -0.027247,
+            +0.106756, +0.099573, +0.069566, +0.044525, +0.019483, -0.010524, -0.017707,
+            +0.111793, +0.104847, +0.077166, +0.054281, +0.031396, +0.003716, -0.003230;
 
         return LookupTable<2>({ beta_grid, dr_grid }, data);
+    }
+
+
+    // ============================================================
+    //  Rate damping derivatives (1D in alpha)
+    //  Slope of dC/d(rate-hat) at zero rate, per radian of
+    //  dimensionless rate (pb/2V, qc/2V, rb/2V).
+    // ============================================================
+
+
+    // ---------- Cm_q(alpha) — pitch damping ----------
+    inline LookupTable<1> build_cm_q_table()
+    {
+        auto alpha_grid = alpha_grid_long();
+        Eigen::VectorXd data(16);
+        data << -47.9589, -44.8888, -43.2584, -41.6279, -40.0265, -38.4252, -34.7600, -31.0949, -29.1224, -27.1499, -29.3433, -31.5367, -34.7161, -37.8955, -45.5756, -49.8276;
+        return LookupTable<1>({ alpha_grid }, data);
+    }
+
+
+    // ---------- Cl_p(alpha) — roll damping ----------
+    inline LookupTable<1> build_cl_p_table()
+    {
+        auto alpha_grid = alpha_grid_long();
+        Eigen::VectorXd data(16);
+        data << -0.3350, -0.3609, -0.3623, -0.3637, -0.3270, -0.2902, -0.2046, -0.1190, -0.0510, +0.0170, -0.0118, -0.0405, -0.0627, -0.0848, -0.1272, -0.1724;
+        return LookupTable<1>({ alpha_grid }, data);
+    }
+
+
+    // ---------- Cl_r(alpha) — roll due to yaw rate ----------
+    inline LookupTable<1> build_cl_r_table()
+    {
+        auto alpha_grid = alpha_grid_long();
+        Eigen::VectorXd data(16);
+        data << +0.0267, +0.0717, +0.0978, +0.1240, +0.1594, +0.1948, +0.2570, +0.3193, +0.3371, +0.3549, +0.3572, +0.3595, +0.3670, +0.3746, +0.3910, +0.4127;
+        return LookupTable<1>({ alpha_grid }, data);
+    }
+
+
+    // ---------- Cn_p(alpha) — yaw due to roll rate ----------
+    inline LookupTable<1> build_cn_p_table()
+    {
+        auto alpha_grid = alpha_grid_long();
+        Eigen::VectorXd data(16);
+        data << -0.0070, -0.0023, -0.0187, -0.0351, -0.0573, -0.0795, +0.0019, +0.0834, +0.0788, +0.0743, +0.0395, +0.0047, +0.0054, +0.0062, +0.0259, +0.0364;
+        return LookupTable<1>({ alpha_grid }, data);
+    }
+
+
+    // ---------- Cn_r(alpha) — yaw damping ----------
+    inline LookupTable<1> build_cn_r_table()
+    {
+        auto alpha_grid = alpha_grid_long();
+        Eigen::VectorXd data(16);
+        data << -0.3637, -0.3781, -0.3805, -0.3830, -0.3871, -0.3913, -0.3830, -0.3748, -0.3913, -0.4078, -0.4197, -0.4316, -0.4223, -0.4129, -0.3953, -0.3670;
+        return LookupTable<1>({ alpha_grid }, data);
     }
 
 

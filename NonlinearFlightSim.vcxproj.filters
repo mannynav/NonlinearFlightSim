@@ -83,12 +83,48 @@
     <ClInclude Include="LinearSimulation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AtmosphereModel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TrimRoutine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SimConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AircraftFactory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="F16Aircraft.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineModel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LQRSimulation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LQRController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="trim_states.csv">
       <Filter>Source Files</Filter>
     </None>
     <None Include="trim_controls.csv">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="gravity_atm_data_alt_m.csv">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="gravity_atm_data_c_mps.csv">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="gravity_atm_data_g_mps2.csv">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="gravity_atm_data_rho_kgpm3.csv">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
