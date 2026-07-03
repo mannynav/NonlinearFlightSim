@@ -1,9 +1,9 @@
 
 #pragma once
-
 #include "AircraftFactory.h"        // AircraftType
 #include "Attitudekinematics.h"   // AttitudeMode
 #include "Constants.h"
+#include "GravityModel.h"
 
 
 // ============================================================
@@ -52,6 +52,10 @@ struct SimConfig
     // ---- Output verbosity ----
     bool verbose_trim = true;
     bool run_lqr = false;
+
+    // ---- Gravity ----
+    GravityModelType gravity_model = GravityModelType::Tabulated;
+    double latitude_deg = 45.0;
 
     // Convenience: derived timestep
     double nl_dt()   const { return nl_length / nl_steps; }

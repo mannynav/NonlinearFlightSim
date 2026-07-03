@@ -25,7 +25,7 @@ inline void printModeAnalysis(const std::string& label, const Eigen::MatrixXd& A
 {
     Eigen::EigenSolver<Eigen::MatrixXd> solver(A_block);
     auto evals = solver.eigenvalues();
-    constexpr double NEUTRAL_TOL = 1e-6;
+    constexpr double NEUTRAL_TOL = 1e-5;
 
     std::cout << "\n--- " << label << " modes ---\n";
     std::cout << std::left

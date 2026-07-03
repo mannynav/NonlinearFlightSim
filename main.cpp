@@ -38,6 +38,9 @@
 #include "LQRSimulation.h"
 //#include "LQRController.h"
 
+// Gravity file
+#include "GravityModel.h"
+
 
 inline void runGTMAeroSanityCheck()
 {
@@ -66,7 +69,8 @@ inline void runGTMAeroSanityCheck()
 //    7. Linear longitudinal & lateral sims
 // ============================================================
 
-void runSimulation(const SimConfig& cfg, const AtmosphereData& atm)
+
+void runSimulation(const SimConfig& cfg, AtmosphereData& atm)
 {
     std::cout << "\n############################################################\n";
     std::cout
@@ -74,6 +78,15 @@ void runSimulation(const SimConfig& cfg, const AtmosphereData& atm)
         << "  |  h = " << cfg.trim_h << " m"
         << "  |  gamma = " << cfg.trim_gamma * constants::RAD_TO_DEG << " deg\n";
     std::cout << "############################################################\n";
+
+
+    atm.gravity_override = makeGravityModel(cfg.gravity_model, cfg.latitude_deg);
+    std::cout << "Gravity model: "
+        << (atm.gravity_override ? atm.gravity_override->name() : "Tabulated (NESC table)")
+        << (cfg.gravity_model == GravityModelType::WGS84
+            ? ("  at latitude " + std::to_string(cfg.latitude_deg) + " deg") : "")
+        << "\n";
+
 
     std::unique_ptr<AttitudeKinematics> kin = makeAttitudeKinematics(cfg.att_mode);
     std::cout << "Attitude mode: " << kin->name()
@@ -229,18 +242,27 @@ int main()
     //SimConfig cfg = SimConfig::gtm_cruise();
     //SimConfig cfg = SimConfig::civil_cruise();
     //SimConfig cfg = SimConfig::climb(AircraftType::NasaGTM, 6.0);
-    SimConfig cfg = SimConfig::f16_lqr_demo();
+    //SimConfig cfg = SimConfig::f16_lqr_demo();
     //SimConfig cfg = SimConfig::f16_cruise();
-    runSimulation(cfg, atm);
+    //cfg.gravity_model = GravityModelType::WGS84;
+    //runSimulation(cfg, atm);
 
-    // ---- Or sweep several operating points (uncomment to use) ----
-    // for (double gam : {0.0, 3.0, 6.0, 10.0, 15.0}) {
-    //     runSimulation(SimConfig::climb(AircraftType::NasaGTM, gam), atm);
-    // }
+    //// ---- Sweep several operating points (uncomment to use) ----
+    //for (double gam : {0.0, 3.0, 6.0, 10.0, 15.0}) {
+    //    runSimulation(SimConfig::climb(AircraftType::NasaGTM, gam), atm);
+    //}
+
+    // ---- Sweep for latitude ----
+    for (double lat : {0.0, 45.0, 90.0}) {
+        SimConfig cfg = SimConfig::f16_cruise();
+        cfg.gravity_model = GravityModelType::WGS84;
+        cfg.latitude_deg = lat;
+        runSimulation(cfg, atm);
+    }
 
     // ----- NESC verification (representation-only, run once) -----
-    auto kin = makeAttitudeKinematics(AttitudeMode::Quaternion);
-    runAllNESCCheckCases(*kin);
+    //auto kin = makeAttitudeKinematics(AttitudeMode::Quaternion);
+    //runAllNESCCheckCases(*kin);
 
     std::cout << "\nAll outputs written. Done.\n";
     return 0;

@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "GravityModel.h"
+
 
 // ============================================================
 //  Atmosphere Data
@@ -59,10 +61,13 @@ struct AtmosphereData
     std::vector<double> gravity_mps2;        // m/s^2
     std::vector<double> air_density_kgpm3;   // kg/m^3
 
+    std::shared_ptr<const GravityModel> gravity_override = nullptr;
+
     double speedOfSound(double alt_m) const {
         return atm_detail::linear_interp_1d(altitude_m, speed_of_sound_mps, alt_m);
     }
     double gravity(double alt_m) const {
+        if (gravity_override) return gravity_override->g(alt_m);
         return atm_detail::linear_interp_1d(altitude_m, gravity_mps2, alt_m);
     }
     double airDensity(double alt_m) const {
