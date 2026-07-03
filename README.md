@@ -48,6 +48,35 @@ The code is built around three layered abstractions:
 
 Run-time configuration is centralized in a `SimConfig` struct with factory functions (`civil_cruise()`, `gtm_cruise()`, `climb(type, gamma_deg)`, `f16_cruise()`, `f16_lqr_demo()`), so `main()` reduces to: load atmosphere, select a config, run.
 
+## Gravity Models
+
+Gravity is abstracted behind a `GravityModel` interface — the same pluggable pattern used for engines — with three implementations of increasing fidelity:
+
+| Model | Law | Source |
+|---|---|---|
+| Tabulated (default) | NESC reference table, interpolated over 1020 altitude points | NESC check-case data |
+| Inverse-square | g(h) = g₀·(r₀/(r₀+h))², g₀ = 9.80665 m/s², r₀ = 6,356,766 m | US Standard Atmosphere 1976 |
+| WGS-84 | Somigliana normal gravity γ(φ) with second-order free-air altitude correction | NIMA TR8350.2 |
+
+The tabulated model is selected by default and reproduces the pre-abstraction behavior exactly (regression-guaranteed by construction: no override attached means the original table lookup runs). The analytic inverse-square law reproduces the NESC table to ~6 significant digits, cross-validating the reference data against the physical law it was generated from.
+
+The WGS-84 model adds the latitude dependence of gravity on the oblate Earth — a 0.53% variation from equator (9.7803 m/s²) to pole (9.8322 m/s²) that spherical models ignore. Normal gravity includes the centrifugal term for an Earth-fixed observer, which is the correct effective gravity for a flat-Earth NED simulation. Latitude is a per-run configuration parameter (`SimConfig::latitude_deg`); for trajectories under a few hundred kilometers of ground track, treating latitude as fixed introduces error well below the other model tolerances.
+
+## Latitude sweep validation
+
+F-16 trim at Va = 180 m/s, h = 9,000 m under WGS-84 gravity across three latitudes:
+
+| Latitude | g (m/s²) | α (deg) | Stabilizer (deg) | Throttle |
+|---|---|---|---|---|
+| 0° (equator) | 9.75259 | 5.5083 | −1.8361 | 0.10596 |
+| 45° | 9.77849 | 5.5228 | −1.8410 | 0.10623 |
+| 90° (pole) | 9.80449 | 5.5374 | −1.8458 | 0.10650 |
+
+The trim shifts are monotone and physically consistent: the aircraft is effectively 0.53% heavier at the pole, requiring ~0.5% more lift (higher α) and paying ~0.5% more induced drag (higher throttle). Trim converges quadratically in 3 iterations at every latitude.
+
+The modal analysis provides a sharper theoretical check. Across the sweep, the phugoid natural frequency scales linearly with gravity to five significant digits (ω-ratio 1.00530 vs. g-ratio 1.00532, matching the classical approximation ωₙ ≈ √2·g/V), while the short-period frequency is invariant to the fifth digit — correct, since the short period is set by aerodynamic stiffness and pitch inertia, not weight. The gravity model propagates through trim, linearization, and modal structure exactly as classical flight dynamics predicts.
+
+
 ## LQR Autopilot
 
 The F-16 longitudinal autopilot is designed by solving the continuous-time algebraic Riccati equation
@@ -120,6 +149,7 @@ Throttle scales linearly with sin(γ) across this sweep, matching the first-prin
 - Nelson, *Flight Stability and Automatic Control* — published F-16 stability derivatives.
 - Bryson, Ho, *Applied Optimal Control* — LQR formulation and weighting rule.
 - Potter, J. E. (1966), "Matrix Quadratic Solutions," *SIAM Journal on Applied Mathematics* — Hamiltonian eigendecomposition for the Riccati equation.
+- Department of Defense World Geodetic System 1984 (NIMA TR8350.2) — WGS-84 ellipsoid and normal-gravity constants.
 
 ## Future Work
 
