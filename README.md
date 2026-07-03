@@ -138,6 +138,7 @@ Throttle scales linearly with sin(γ) across this sweep, matching the first-prin
 | `LQRController.h` | CARE solver, optimal-gain computation |
 | `LQRSimulation.h` | Open-/closed-loop nonlinear simulation |
 | `SimConfig.h` | Configuration struct and scenario factories |
+| `Gravity.h` | Tabulated, inverse square, WGS-84 |
 | `main.cpp` | Pipeline (`runSimulation`) and entry point |
 
 ## References
